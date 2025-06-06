@@ -18,9 +18,14 @@ export default {
 	},
 	mounted() {},
 	methods: {
-		async run_py() {
-			const result = await this.$invoke("greet", { data: JSON.stringify({ a: 666, b: "aaa", c: [6,5,4,3,"555"] }) })
-			console.log(JSON.parse(result))
+		run_py() {
+			this.$invoke("run_python", { data: { a: 666, b: "aaa", c: [6, 5, 4, 3, "555"] }, templatePath: "src/template.py" })
+				.then((result) => {
+					console.log(JSON.parse(result))
+				})
+				.catch((error) => {
+					console.error(error)
+				})
 		},
 	},
 }

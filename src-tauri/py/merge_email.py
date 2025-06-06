@@ -1,1 +1,6 @@
-print("正在处理文件: 模板文件路径")
+import sys
+
+json_str = sys.argv[1]
+temp_path = sys.argv[2]
+
+print(json_str)
