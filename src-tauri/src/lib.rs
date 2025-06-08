@@ -2,27 +2,34 @@
 use serde::Deserialize;
 use std::process::Command;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct RunScriptParams {
     data: serde_json::Value, // 动态 JSON 对象
-    templatePath: String,
+    template_path: String,
 }
 #[tauri::command]
 fn run_python(params: RunScriptParams) -> Result<String, String> {
     // 将对象序列化为 JSON 字符串传给 Python
     let json_string = serde_json::to_string(&params.data).unwrap();
-
-    let output = Command::new("python3")
-        .arg("src-tauri/py/merge_email.py")
+    // 调用 Python 脚本并传递 JSON 字符串和模板路径
+    let output = Command::new("python")
+        .arg("resources/merge_email.py")
         .arg(json_string)
-        .arg(&params.templatePath)
+        .arg(&params.template_path)
         .output()
         .map_err(|e| e.to_string())?;
 
+    // 检查命令是否成功执行 处理输出结果
     if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let output_str = String::from_utf8_lossy(&output.stdout).into_owned();
+        if output_str.trim().is_empty() {
+            Err("Python脚本未返回有效数据".to_string())
+        } else {
+            Ok(output_str)
+        }
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        let error_msg = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Python脚本执行错误: {}", error_msg))
     }
 }
 

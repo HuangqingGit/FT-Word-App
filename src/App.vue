@@ -14,12 +14,21 @@
 export default {
 	name: "App",
 	data() {
-		return {}
+		return {
+			params: {
+				template_path: "C:/Users/Github/Desktop/cs.docx",
+				data: {
+					name: "ft",
+					age: 18,
+					num: 100,
+				},
+			},
+		}
 	},
 	mounted() {},
 	methods: {
 		run_py() {
-			this.$invoke("run_python", { data: { a: 666, b: "aaa", c: [6, 5, 4, 3, "555"] }, templatePath: "src/template.py" })
+			this.$invoke("run_python", { params: this.params })
 				.then((result) => {
 					console.log(JSON.parse(result))
 				})
