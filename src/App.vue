@@ -60,6 +60,8 @@
 </template>
 
 <script>
+import { ElMessageBox } from "element-plus"
+import "element-plus/dist/index.css"
 export default {
 	name: "App",
 	data() {
@@ -145,6 +147,18 @@ export default {
 						this.writeText(fileName, this.menu_list[index[0]])
 						break
 					case "rename":
+						let name1 = this.menu_list[index[0]].P_name
+						let name2 = this.menu_list[index[0]].children[index[1]].name
+						ElMessageBox.prompt("请输入新的分类名称", {
+							title: `${name1} · ${name2}`,
+							confirmButtonText: "确认",
+							cancelButtonText: "取消",
+							showClose: false,
+							inputValue: name2,
+							inputValidator: this.validateName,
+						}).then((value) => {
+							if (value !== "cancel") this.menu_list[index[0]].children[index[1]].name = value.value
+						})
 						break
 				}
 			} else {
@@ -164,69 +178,107 @@ export default {
 				}
 			}
 		},
+		/**
+		 * 项目改名表达式验证
+		 * @param name
+		 */
+		validateName(name) {
+			// 定义允许的特殊符号
+			const allowedSymbols = "（）()【】-+_"
+			// 检查长度
+			if (name.length < 2 || name.length > 8) {
+				return "名称应控制在2-8位之间"
+			}
+			// 检查是否有不允许的字符
+			const regex = /^[\u4e00-\u9fa5a-zA-Z0-9（）()【】\-+_]+$/
+			if (!regex.test(name)) {
+				// 找出不允许的字符
+				const invalidChars = []
+				for (const char of name) {
+					if (!/^[\u4e00-\u9fa5a-zA-Z0-9]$/.test(char) && !allowedSymbols.includes(char)) {
+						if (!invalidChars.includes(char)) {
+							invalidChars.push(char)
+						}
+					}
+				}
+				return `允许的特殊符号：${allowedSymbols}`
+			}
+			// 如果都符合
+			return true
+		},
 
 		/**
 		 * 获取项目列表
 		 */
 		get_project_list() {
-			// 清空菜单列表
-			this.menu_list = []
-			// 检查目录是否存在，如果不存在则创建
-			this.$readDir(this.dirPath, { baseDir: this.$BaseDirectory.Document })
-				.then((files) => {
-					if (files.length === 0) {
-						console.log("目录为空")
-						return
-					}
-
-					// 处理文件列表，假设每个文件名是 "项目名称.js"
-					files.forEach((file) => {
-						this.$readFile(this.dirPath + "/" + file.name, { baseDir: this.$BaseDirectory.Document })
-							.then((u8Array) => {
-								let content = JSON.parse(new TextDecoder("utf-8").decode(u8Array)) // Uint8Array 转换为json数据
-								content.F_name = file.name // 添加文件名到内容中
-								this.menu_list.push(content) // 将项目名称和子项添加到菜单列表
+			// 检查目录路径是否存在
+			this.create_dir(this.dirPath, true).then((res) => {
+				if (!res.code) {
+					// 清空菜单列表
+					this.menu_list = []
+					// 检查目录是否存在，如果不存在则创建
+					this.$readDir(this.dirPath, { baseDir: this.$BaseDirectory.Document })
+						.then((files) => {
+							// 处理文件列表
+							files.forEach((file) => {
+								// 判断当前项是否为文件类型，且文件后缀是否为指定的json文件
+								if (file.isFile && file.name.split(".")[1].toLowerCase() === "json") {
+									this.$readFile(this.dirPath + "/" + file.name, { baseDir: this.$BaseDirectory.Document })
+										.then((u8Array) => {
+											let content = JSON.parse(new TextDecoder("utf-8").decode(u8Array)) // Uint8Array 转换为json数据
+											content.F_name = file.name // 添加文件名到内容中
+											this.menu_list.push(content) // 将项目名称和子项添加到菜单列表
+										})
+										.catch((error) => {
+											console.error("读取文件失败:", error)
+										})
+								}
 							})
-							.catch((error) => {
-								console.error("读取文件失败:", error)
-							})
-					})
-				})
-				.catch((error) => {
-					console.error("Error reading project list:", error)
-				})
+						})
+						.catch((error) => {
+							console.error("Error reading project list:", error)
+						})
+				}
+			})
 		},
 
 		/**
-		 * 目录检查是存在/创建目录
+		 * 目录检查是存在/创建目录（支持递归创建）
 		 * @param {String} path 检查路径
 		 * @param {Boolean} [isCreate=false] 是否创建目录
-		 * @returns {Promise<Boolean>} true/false
+		 * @returns {Promise<Object>} 返回包含code和msg的对象
 		 */
 		create_dir(path, isCreate = false) {
 			let th = this
-			return new Promise((resolve, reject) => {
-				// 检查目录是否存在，如果不存在则创建
-				th.$exists(path, { baseDir: th.$BaseDirectory.Document })
-					.then((exists) => {
-						if (!exists && isCreate) {
-							th.$mkdir(path, { baseDir: th.$BaseDirectory.Document })
-								.then(() => {
-									resolve(true)
-								})
-								.catch((error) => {
-									// 创建目录时出错
-									reject(error)
-								})
-						} else {
-							// 返回检查结果
-							resolve(exists)
+			return new Promise(async (resolve, reject) => {
+				try {
+					// 检查目录是否存在
+					const exists = await th.$exists(path, { baseDir: th.$BaseDirectory.Document })
+					// 检查的路径/文件存在就返回结果
+					if (exists) return resolve({ code: 0, msg: "Directory already exists √" })
+					// 如果不用创建则直接返回检查结果
+					if (!isCreate) return resolve({ code: 1, msg: "Directory does not exist ×" })
+					// 递归创建目录
+					const parts = path.split("/").filter(Boolean)
+					let currentPath = ""
+					for (const part of parts) {
+						currentPath = currentPath ? `${currentPath}/${part}` : part
+						const exists = await th.$exists(currentPath, { baseDir: th.$BaseDirectory.Document })
+						if (!exists) {
+							await th.$mkdir(currentPath, {
+								baseDir: th.$BaseDirectory.Document,
+							})
 						}
+					}
+
+					resolve({ code: 0, msg: "Directory created successfully √" })
+				} catch (error) {
+					reject({
+						code: 1,
+						msg: "Failed to create directory ×",
+						error,
 					})
-					.catch((error) => {
-						// 检查目录时出错
-						reject(error)
-					})
+				}
 			})
 		},
 
@@ -239,14 +291,14 @@ export default {
 		writeText(writePath, writeData) {
 			let th = this
 			return new Promise((resolve, reject) => {
-				// 写入文件 这里的需要转字符串再写入
-				th.$writeTextFile(writePath, JSON.stringify(writeData), { baseDir: th.$BaseDirectory.Document, encoding: "utf-8" })
-					.then(() => {
-						resolve({ code: 0, msg: "Write success √" })
-					})
-					.catch((error) => {
-						reject({ code: 1, msg: "Write failed ×", error })
-					})
+				try {
+					// 写入文件 这里的需要转字符串再写入
+					const writeRes = th.$writeTextFile(writePath, JSON.stringify(writeData), { baseDir: th.$BaseDirectory.Document, encoding: "utf-8" })
+					// 写入成功 返回结果
+					if (writeRes) resolve({ code: 0, msg: "Write success √" })
+				} catch (error) {
+					reject({ code: 1, msg: "Write failed ×", error })
+				}
 			})
 		},
 
@@ -258,14 +310,14 @@ export default {
 		delFile(delPath) {
 			let th = this
 			return new Promise((resolve, reject) => {
-				// 写入文件 这里的需要转字符串再写入
-				th.$remove(delPath, { baseDir: th.$BaseDirectory.Document })
-					.then(() => {
-						resolve({ code: 0, msg: "Delete success √" })
-					})
-					.catch((error) => {
-						reject({ code: 1, msg: "Delete failed ×", error })
-					})
+				try {
+					// 写入文件 这里的需要转字符串再写入
+					const remRes = th.$remove(delPath, { baseDir: th.$BaseDirectory.Document })
+					// 删除成功 返回结果
+					if (remRes) resolve({ code: 0, msg: "Delete success √" })
+				} catch (error) {
+					reject({ code: 1, msg: "Delete failed ×", error })
+				}
 			})
 		},
 	},
@@ -281,10 +333,12 @@ export default {
 .el-popover.el-popper {
 	padding: 0;
 	margin: 0;
+
 	.ft-menu-ul {
 		.ft-delete {
 			color: #f40;
 		}
+
 		.ft-menu-li {
 			user-select: none;
 			height: 35px;
@@ -293,15 +347,18 @@ export default {
 			justify-content: space-between;
 			padding: 0 12px;
 		}
+
 		.ft-menu-li:hover {
 			background-color: #f0f0f0;
 			cursor: pointer;
+
 			.ft-select-text {
 				display: flex;
-				justify-content: space-between; /* 平均分布 */
+				justify-content: space-between;
 				width: 100%;
 			}
 		}
+
 		.ft-menu-li:active {
 			background-color: #d9d9d9;
 		}
@@ -311,6 +368,7 @@ export default {
 #app {
 	height: 100vh;
 	background-color: #f2f6fc;
+
 	.el-header {
 		padding: 0 0;
 		margin: 0 0;
@@ -352,6 +410,7 @@ export default {
 				.el-icon:hover {
 					background-color: #f0f0f0;
 				}
+
 				.el-icon:active {
 					background-color: #d9d9d9;
 				}
@@ -361,6 +420,7 @@ export default {
 				border-right: 0px;
 			}
 		}
+
 		.el-main {
 			margin-top: 4px;
 			margin-left: 2px;
