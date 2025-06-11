@@ -13,7 +13,7 @@ fn run_python(params: RunScriptParams) -> Result<String, String> {
     let json_string = serde_json::to_string(&params.data).unwrap();
     // 调用 Python 脚本并传递 JSON 字符串和模板路径
     let output = Command::new("python")
-        .arg("resources/merge_email.py")
+        .arg("resources/py/merge_email.py")
         .arg(json_string)
         .arg(&params.template_path)
         .output()
@@ -37,6 +37,7 @@ fn run_python(params: RunScriptParams) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![run_python])
         .run(tauri::generate_context!())
