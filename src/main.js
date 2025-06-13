@@ -11,11 +11,13 @@ import {
     writeTextFile,
     BaseDirectory
 } from '@tauri-apps/plugin-fs';
+import { open } from '@tauri-apps/plugin-dialog';
 import App from "./App.vue";
 
 
 const app = createApp(App);
 
+app.config.globalProperties.$OpenFile = open;
 app.config.globalProperties.$invoke = invoke;
 app.config.globalProperties.$mkdir = mkdir;
 app.config.globalProperties.$exists = exists;
