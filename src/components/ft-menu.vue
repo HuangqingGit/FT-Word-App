@@ -39,11 +39,11 @@
 					<el-dropdown-menu class="dro-item">
 						<el-dropdown-item>
 							<ft-ep-plus />
-							<span>新建模板</span>
+							<span>新建项目</span>
 						</el-dropdown-item>
 						<el-dropdown-item @click="importProject">
 							<ft-ep-document />
-							<span>导入模板</span>
+							<span>导入项目</span>
 						</el-dropdown-item>
 					</el-dropdown-menu>
 				</template>
@@ -200,8 +200,14 @@ export default {
 									})
 										.then((u8Array) => {
 											const content = JSON.parse(new TextDecoder("utf-8").decode(u8Array))
-											content.F_name = file.name // 添加文件名
-											return content
+											// 检查数据格式
+											let ver = new Set(Object.keys(content))
+											let arr = ["name", "prefix", "icon", "children"]
+											if (arr.every((item) => ver.has(item))) {
+												content.fileName = file.name // 添加文件名
+												return content
+											}
+											return null
 										})
 										.catch((error) => {
 											console.error("读取文件失败:", error)
@@ -306,7 +312,7 @@ export default {
 		menu_options_event(re_type) {
 			this.$refs.ftPopover?.hide() // 隐藏Popover
 			let index = this.curMenuIndex // 当前右键选项的indexs
-			let fileName = `${this.dirPath}/${this.menuList[index[0]].F_name}` // 获取当前选择项目的文件名
+			let fileName = `${this.dirPath}/${this.menuList[index[0]].fileName}` // 获取当前选择项目的文件名
 			let name1 = this.menuList[index[0]].name // 获取选择项目的名称
 			if (index.length > 1) {
 				let name2 = this.menuList[index[0]].children[index[1]].name // 获取选中分类的名称
@@ -393,7 +399,7 @@ export default {
 							closed: async () => {
 								try {
 									let newObj = JSON.parse(JSON.stringify(this.menuList[index[0]]))
-									delete newObj.F_name
+									delete newObj.fileName
 									const exp = await this.writeText(`${name1}.json`, newObj, this.$BaseDirectory.Desktop)
 									if (!exp.code) {
 										ElMessage({ type: "success", message: "已导出到桌面", plain: true, offset: 85, grouping: true })
