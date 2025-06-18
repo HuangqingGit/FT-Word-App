@@ -50,6 +50,9 @@ export default {
 <style lang="less">
 body {
 	overflow: hidden;
+	.el-message__content {
+		user-select: none;
+	}
 }
 
 * {
