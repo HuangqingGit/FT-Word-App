@@ -178,17 +178,11 @@ export default {
 	watch: {
 		// 新建项目输入Value 变化监听事件
 		projectName(newVal) {
-			let valiValue = this.validateName(newVal)
-			if (typeof valiValue === "string") {
-				this.isErrorText = true
-				this.isClickConfirm = true
-				this.dialogText = valiValue
-			} else {
-				this.isErrorText = false
-				this.isClickConfirm = false
-				if (!this.isEditPrefix) return // 如果为编辑模式则直接退出，不修改项目前缀
-				this.projectPrefix = this.getFirstLetter(newVal)
-			}
+			this.editAuxFun(newVal)
+		},
+		// 头像变化监听事件
+		projectImgBase64() {
+			this.editAuxFun(this.projectName)
 		},
 		// 当前选中菜单变化监听事件
 		curActive(newVal) {
@@ -200,6 +194,20 @@ export default {
 		this.getProjectList()
 	},
 	methods: {
+		// 编辑项目辅助函数
+		editAuxFun(name) {
+			let valiValue = this.validateName(name)
+			if (typeof valiValue === "string") {
+				this.isErrorText = true
+				this.isClickConfirm = true
+				this.dialogText = valiValue
+			} else {
+				this.isErrorText = false
+				this.isClickConfirm = false
+				if (!this.isEditPrefix) return // 如果为编辑模式则直接退出，不修改项目前缀
+				this.projectPrefix = this.getFirstLetter(name)
+			}
+		},
 		// 创建项目分类
 		createClass() {
 			// 如果sessionStorage中不存在Active值，则默认选择第一项进行添加
