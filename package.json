@@ -15,6 +15,7 @@
 		"@tauri-apps/plugin-dialog": "~2",
 		"@tauri-apps/plugin-fs": "~2",
 		"@tauri-apps/plugin-opener": "^2",
+		"@tauri-apps/plugin-shell": "~2",
 		"element-plus": "^2.9.11",
 		"less": "^4.3.0",
 		"less-loader": "^12.3.0",
