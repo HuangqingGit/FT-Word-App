@@ -56,10 +56,15 @@ export default {
 	},
 	methods: {},
 	mounted() {
+		// 启动时获取窗口状态
+		setTimeout(async () => {
+			this.isMaximized = await this.ftWin.isMaximized()
+		}, 0)
+		// 监听窗口变化时的状态
 		getCurrentWindow().listen("tauri://resize", ({ event, payload }) => {
 			setTimeout(async () => {
 				this.isMaximized = await this.ftWin.isMaximized()
-			}, 100)
+			}, 0)
 		})
 	},
 }
