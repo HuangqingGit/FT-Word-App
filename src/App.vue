@@ -7,7 +7,19 @@
 				<ft-menu />
 			</el-aside>
 			<el-main>
-				<el-button @click="run_py">Python</el-button>
+				<el-button @click="run_shell">Python</el-button>
+				<div>
+					<el-text>状态码：{{ text.code }}</el-text>
+				</div>
+				<div>
+					<el-text>信号：{{ text.signal }}</el-text>
+				</div>
+				<div>
+					<el-text>输出错误：{{ text.stderr }}</el-text>
+				</div>
+				<div>
+					<el-text>标准输出：{{ text.stdout }}</el-text>
+				</div>
 			</el-main>
 		</el-container>
 	</el-container>
@@ -15,12 +27,12 @@
 
 <script>
 import "element-plus/dist/index.css"
-import ftMenu from "./components/ft-menu.vue"
+import { Command } from "@tauri-apps/plugin-shell"
 export default {
-	components: { ftMenu },
 	name: "App",
 	data() {
 		return {
+			text: {},
 			params: {
 				template_path: "C:/Users/Github/Desktop/cs.docx",
 				data: {
@@ -42,6 +54,15 @@ export default {
 				.catch((error) => {
 					console.error(error)
 				})
+		},
+		async run_shell() {
+			try {
+				const command = Command.sidecar("bin/email", [JSON.stringify(this.params.data), this.params.template_path])
+				const output = await command.execute()
+				this.text = output
+			} catch (err) {
+				console.error("❌ Sidecar spawn failed:", err)
+			}
 		},
 	},
 }

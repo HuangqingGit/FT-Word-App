@@ -7,7 +7,9 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
-		"tauri": "tauri"
+		"tauri": "tauri",
+		"tauri:build": "node scripts/prebuild.cjs && tauri build",
+		"tauri:dev": "node scripts/prebuild.cjs && tauri dev"
 	},
 	"dependencies": {
 		"@element-plus/icons-vue": "^2.3.1",
