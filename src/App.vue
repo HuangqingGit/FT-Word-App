@@ -7,19 +7,7 @@
 				<ft-menu />
 			</el-aside>
 			<el-main>
-				<el-button @click="run_py">Python</el-button>
-				<div>
-					<el-text>状态码：{{ text.code }}</el-text>
-				</div>
-				<div>
-					<el-text>信号：{{ text.signal }}</el-text>
-				</div>
-				<div>
-					<el-text>输出错误：{{ text.stderr }}</el-text>
-				</div>
-				<div>
-					<el-text>标准输出：{{ text.stdout }}</el-text>
-				</div>
+				<ft-content />
 			</el-main>
 		</el-container>
 	</el-container>
