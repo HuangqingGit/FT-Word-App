@@ -7,7 +7,7 @@
 				<ft-menu />
 			</el-aside>
 			<el-main>
-				<el-button @click="run_shell">Python</el-button>
+				<el-button @click="run_py">Python</el-button>
 				<div>
 					<el-text>状态码：{{ text.code }}</el-text>
 				</div>
@@ -34,11 +34,12 @@ export default {
 		return {
 			text: {},
 			params: {
-				template_path: "C:/Users/Github/Desktop/cs.docx",
+				template_path: "C:/Users/F-tone/Desktop/新建文件夹/ces.docx",
 				data: {
 					name: "ft",
 					age: 18,
 					num: 100,
+					img: "C:/Users/F-tone/Pictures/61d7678dgy1hvt194v9kqj20p00uuape.jpg",
 				},
 			},
 		}
@@ -49,7 +50,7 @@ export default {
 		run_py() {
 			this.$invoke("run_python", { params: this.params })
 				.then((result) => {
-					console.log(JSON.parse(result))
+					console.log(result)
 				})
 				.catch((error) => {
 					console.error(error)
