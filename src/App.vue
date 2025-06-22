@@ -97,6 +97,7 @@ body {
 		.el-main {
 			margin-top: 4px;
 			margin-left: 2px;
+			padding: 0;
 			background-color: #ffffff;
 			border-radius: 5px;
 		}
