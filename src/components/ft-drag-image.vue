@@ -1,5 +1,5 @@
 <template>
-	<div class="darg-input">
+	<div class="darg-image">
 		<el-card shadow="hover" body-class="body-style" header-class="header-style" footer-class="footer-style">
 			<template #header>
 				<div class="he-left">
@@ -120,7 +120,7 @@ function switchBefore() {
 </script>
 
 <style lang="less">
-.darg-input {
+.darg-image {
 	user-select: none;
 
 	.el-card {
