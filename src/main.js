@@ -12,10 +12,15 @@ import {
     BaseDirectory
 } from '@tauri-apps/plugin-fs';
 import { open } from '@tauri-apps/plugin-dialog';
+import draggable from "vuedraggable"
 import App from "./App.vue";
+import { createPinia } from "pinia";
 
 
 const app = createApp(App);
+
+app.use(createPinia())
+app.component('draggable', draggable);
 
 app.config.globalProperties.$OpenFile = open;
 app.config.globalProperties.$invoke = invoke;

@@ -68,6 +68,7 @@ body {
 * {
 	margin: 0;
 	padding: 0;
+	font-family: Inter, "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
 }
 
 // App样式
@@ -101,6 +102,41 @@ body {
 			background-color: #ffffff;
 			border-radius: 5px;
 		}
+	}
+
+	/* 优化后的 textarea 滚动条样式 */
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	::-webkit-scrollbar-thumb {
+		width: 6px;
+		background-color: transparent;
+		border-radius: 3px;
+		transition: all 0.2s ease-in-out;
+		cursor: pointer;
+		border-right: 2px solid transparent;
+	}
+
+	:hover::-webkit-scrollbar-thumb {
+		background-color: #0002;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background-color: #0003; /* 悬停时显示 */
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+		border-radius: 3px;
+		margin: 10px;
+	}
+
+	::-webkit-scrollbar-button {
+		width: 0;
+		height: 0;
+		display: none;
 	}
 }
 </style>
