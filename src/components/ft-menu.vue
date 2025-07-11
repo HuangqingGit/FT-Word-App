@@ -100,10 +100,30 @@
 			</template>
 
 			<div class="left">
-				<el-avatar shape="square" :size="65" @click="addProjectImg" :src="projectImgBase64" v-if="projectImgBase64" />
-				<el-icon v-if="!projectImgBase64" @click="addProjectImg"><ft-ep-Plus /></el-icon>
+				<div :class="projectImgBase64 ? 'add-Proimg' : 'add-Proimg add-image '" @mouseenter="showActions = true" @mouseleave="showActions = false">
+					<el-image
+						ref="imageRef"
+						v-if="projectImgBase64"
+						:hide-on-click-modal="true"
+						:preview-src-list="[projectImgBase64]"
+						:preview-teleported="true"
+						:src="projectImgBase64"
+						fit="cover"
+					/>
+					<transition name="el-fade-in-linear" v-if="projectImgBase64">
+						<div class="image-actions" v-show="showActions">
+							<div class="actions-icon">
+								<el-icon @click="imageRef.showPreview()"><ft-ep-ZoomIn /></el-icon>
+								<el-icon @click="projectImgBase64 = null"><ft-ep-Delete /></el-icon>
+							</div>
+						</div>
+					</transition>
+					<div class="add-buttom" v-if="!projectImgBase64" @click="addProjectImg">
+						<el-icon><ft-ep-plus /></el-icon>
+					</div>
+				</div>
 				<span class="text">项目图标</span>
-				<span class="text-12px">建议尺寸≤500*500</span>
+				<span class="text-12px">建议尺寸≤200*200</span>
 			</div>
 			<div class="right">
 				<div class="dialog-content-item">
@@ -112,7 +132,7 @@
 				</div>
 				<div class="error-w">
 					<transition name="el-zoom-in-top">
-						<div class="dialog-prompt error" v-if="isErrorText">
+						<div class="dialog-prompt error" v-if="dialogText">
 							<el-icon><ft-ep-CircleCloseFilled /></el-icon>
 							<el-text class="mx-1" size="small">{{ dialogText }}</el-text>
 						</div>
@@ -142,25 +162,26 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, getCurrentInstance, nextTick } from "vue"
+import { ref, watch, onMounted } from "vue"
 import { useMenuStore } from "../stores/index"
 import { ElMessageBox, ElMessage, ElLoading } from "element-plus"
-import pinyin from "pinyin"
 
 // 模板获取当前实例
 const { proxy } = getCurrentInstance()
 
 // ===================== 变量 =====================
 const MenuStore = useMenuStore() // Vue Pinia
+MenuStore.proxy = proxy
 
 const isShowDialog = ref(false) // 是否显示弹窗
-const isErrorText = ref(false) // 项目名称错误提示
 const isClickConfirm = ref(true) // 是否禁止点击确认键
 const isEditPrefix = ref(true) // 是否允许编辑项目前缀
 const projectImgBase64 = ref(null) // 项目头像的Base64
+const imageRef = ref(null) // 当前img的ref名称
 const dialogText = ref(null) // 错误提示
 const projectName = ref(null) // 新建项目输入Value
 const projectPrefix = ref(null) // 新建项目前缀
+const showActions = ref(false)
 
 const triggerDom = ref(null) // 当前触发 Tooltip 的元素
 const hideTooltip = ref(null) // 隐藏 Tooltip 计时器
@@ -221,15 +242,15 @@ function menuItemClick(menu, item) {
 // 编辑项目辅助函数
 function editAuxFun(name) {
 	let valiValue = validateName(name)
-	if (typeof valiValue === "string") {
-		isErrorText.value = true
-		isClickConfirm.value = true
-		dialogText.value = valiValue
+	// 校验成功是为false，错误时为true
+	if (valiValue) {
+		isClickConfirm.value = true // 可提交
+		dialogText.value = valiValue === true ? false : valiValue // 错误提示
 	} else {
-		isErrorText.value = false
-		isClickConfirm.value = false
+		dialogText.value = false // 错误提示隐藏
+		isClickConfirm.value = false // 不可提交
 		if (!isEditPrefix.value) return // 如果为编辑模式则直接退出，不修改项目前缀
-		projectPrefix.value = getFirstLetter(name)
+		projectPrefix.value = MenuStore.getFirstLetter(name) // 获取文本首字母
 	}
 }
 
@@ -262,10 +283,10 @@ function closeDialogEvent() {
 
 // 添加头像点击事件
 function addProjectImg() {
-	openFileSelect(false, false, [{ name: "Image", extensions: ["png", "jpg", "jpeg", "bmp", "webp", "icon", "ico", "gif"] }]).then((img) => {
+	MenuStore.openFileSelect(false, false, [{ name: "Image", extensions: ["png", "jpg", "jpeg", "bmp", "webp", "icon", "ico", "gif"] }]).then((img) => {
 		// 取消选择时，直接退出
 		if (img === null) return
-		proxy.$readFile(img).then((contents) => {
+		MenuStore.readFile(img).then((contents) => {
 			projectImgBase64.value = MenuStore.uint8ArrayToBase64(contents)
 		})
 	})
@@ -284,7 +305,7 @@ function createProject() {
 			isEdit: false,
 			children: [{ name: "默认分类", datas: [] }],
 		}
-		writeText(`${dirPath}/${proIndex}.json`, newObject)
+		MenuStore.writeText(`${dirPath}/${proIndex}.json`, newObject)
 		isShowDialog.value = false
 		ElMessage({ type: "success", message: "创建成功", plain: true, offset: 85, grouping: true })
 		getProjectList() // 刷新目录
@@ -295,7 +316,7 @@ function createProject() {
 		let fileName = curData.fileName // 获取当前文件名
 		curData.name = projectName.value // 赋值新的项目名称
 		curData.icon = projectImgBase64.value // 赋值新的头像Base64
-		writeText(`${dirPath}/${fileName}`, curData) // 写入数据
+		MenuStore.writeText(`${dirPath}/${fileName}`, curData) // 写入数据
 		isShowDialog.value = false // 关闭弹窗
 		ElMessage({ type: "success", message: "编辑成功", plain: true, offset: 85, grouping: true })
 	}
@@ -311,7 +332,7 @@ function importProject() {
 		},
 	]
 	// 打开文件选择框
-	openFileSelect(false, false, options)
+	MenuStore.openFileSelect(false, false, options)
 		.then((res) => {
 			// 选取结果不能为null，为null代表用户取消选择
 			if (res !== null) {
@@ -331,7 +352,7 @@ function importProject() {
 								// 为文件添加唯一ID
 								content.index = proIndex
 								// 数据写入本地
-								writeText(`${dirPath}/${proIndex}.json`, content)
+								MenuStore.writeText(`${dirPath}/${proIndex}.json`, content)
 								ElMessage({ type: "success", message: "导入成功", plain: true, offset: 85, grouping: true })
 								// 刷新列表
 								getProjectList()
@@ -386,7 +407,7 @@ function stopTooltipShow() {
 // 获取项目列表
 function getProjectList() {
 	stopTooltipShow()
-	create_dir(dirPath, true).then((res) => {
+	MenuStore.create_dir(dirPath, true).then((res) => {
 		if (!res.code) {
 			// 清空菜单列表
 			menuList.value = []
@@ -474,25 +495,7 @@ function blurClass(name, item, index) {
 		item.children[index].name = formerName.value
 	}
 	// 写入文件
-	writeText(fileName, item)
-}
-
-/**
- * 获取文本首字母
- * @param {String} str 需要获取首字母的字符串
- * @returns {String}
- * ```javascript
- * let res = getFirstLetter("获取首字母")
- * console.log(res) // 输出：HQSZM
- * ```
- */
-function getFirstLetter(str) {
-	if (!str) return ""
-	const result = pinyin(str, {
-		style: pinyin.STYLE_FIRST_LETTER, // 只获取首字母
-		heteronym: false, // 不启用多音字模式
-	})
-	return result.map((arr) => arr[0].charAt(0).toUpperCase()).join("")
+	MenuStore.writeText(fileName, item)
 }
 
 /**
@@ -547,14 +550,14 @@ function onContext(e, index, itemIndex) {
  * @returns {Boolean|String}
  * ```javascript
  * const res = validateName(name)
- * console.log(res) // 输出结果
+ * console.log(res) // 输出结果OK：false；NO：true
  * ```
  */
 function validateName(name) {
 	// 定义允许的特殊符号
 	const allowedSymbols = "（）()【】-+_"
-	// 传递参数为null返回False
-	if (name === null) return false
+	// 传递参数为null返回True
+	if (name === null) return true
 	// 检查长度
 	if (name.length < 2 || name.length > 8) {
 		return "名称应控制字数在2-8位之间"
@@ -574,7 +577,7 @@ function validateName(name) {
 		return `允许的特殊符号：${allowedSymbols}`
 	}
 	// 如果都符合
-	return true
+	return false
 }
 
 /**
@@ -608,7 +611,7 @@ function menuOptionsEvent(re_type) {
 					})
 						.then(() => {
 							projectData.children.splice(index[1], 1)
-							writeText(fileName, projectData)
+							MenuStore.writeText(fileName, projectData)
 							ElMessage({ type: "success", message: "删除成功", plain: true, offset: 85, grouping: true })
 							// 获取当前对象长度
 							let delLength = projectData.children.length
@@ -638,7 +641,7 @@ function menuOptionsEvent(re_type) {
 					type: "warning",
 				})
 					.then(() => {
-						delFile(fileName)
+						MenuStore.delFile(fileName)
 						menuList.value.splice(index[0], 1)
 						ElMessage({ type: "success", message: "删除成功", plain: true, offset: 85, grouping: true })
 						// 删除项目后，如果被删除的一级目录是被激活的目录，则清理sessionStorage中缓存的数据
@@ -655,7 +658,7 @@ function menuOptionsEvent(re_type) {
 						try {
 							let newObj = JSON.parse(JSON.stringify(menuList.value[index[0]]))
 							delete newObj.fileName
-							const exp = await writeText(`${name1}.json`, newObj, proxy.$BaseDirectory.Desktop)
+							const exp = await MenuStore.writeText(`${name1}.json`, newObj, proxy.$BaseDirectory.Desktop)
 							if (!exp.code) {
 								ElMessage({ type: "success", message: "已导出到桌面", plain: true, offset: 85, grouping: true })
 							}
@@ -679,117 +682,6 @@ function menuOptionsEvent(re_type) {
 				break
 		}
 	}
-}
-
-/**
- * 目录检查是存在/创建目录（支持递归创建）
- * @param {String} path 检查路径
- * @param {Boolean} [isCreate=false] 是否创建目录
- * @param {Object} [baseDir=Document] 根目录
- * @returns {Promise<Object>} 返回包含code和msg的对象
- */
-function create_dir(path, isCreate = false, baseDir = proxy.$BaseDirectory.Document) {
-	return new Promise(async (resolve, reject) => {
-		try {
-			// 检查目录是否存在
-			const exists = await proxy.$exists(path, { baseDir: baseDir })
-			// 检查的路径/文件存在就返回结果
-			if (exists) return resolve({ code: 0, msg: "Directory already exists √" })
-			// 如果不用创建则直接返回检查结果
-			if (!isCreate) return resolve({ code: 1, msg: "Directory does not exist ×" })
-			// 递归创建目录
-			const parts = path.split("/").filter(Boolean)
-			let currentPath = ""
-			for (const part of parts) {
-				currentPath = currentPath ? `${currentPath}/${part}` : part
-				const exists = await proxy.$exists(currentPath, { baseDir: baseDir })
-				if (!exists) {
-					await proxy.$mkdir(currentPath, { baseDir: baseDir })
-				}
-			}
-			resolve({ code: 0, msg: "Directory created successfully √" })
-		} catch (error) {
-			reject({
-				code: 1,
-				msg: "Failed to create directory ×",
-				error,
-			})
-		}
-	})
-}
-
-/**
- * 写入文件
- * @param {String} writePath 写入路径
- * @param {Object} writeData 项目数据
- * @param {Object} [baseDir=Documet] 项目数据
- * @returns {Promise<Object>}
- */
-function writeText(writePath, writeData, baseDir = proxy.$BaseDirectory.Document) {
-	return new Promise((resolve, reject) => {
-		try {
-			// 写入文件 这里的需要转字符串再写入
-			const writeRes = proxy.$writeTextFile(writePath, JSON.stringify(writeData), { baseDir: baseDir, encoding: "utf-8" })
-			// 写入成功 返回结果
-			if (writeRes) {
-				resolve({ code: 0, msg: "Write success √" })
-			} else {
-				reject({ code: 1, msg: "Write failed ×" })
-			}
-		} catch (error) {
-			reject({ code: 1, msg: "Write failed ×", error })
-		}
-	})
-}
-
-/**
- * 删除文件
- * @param {String} delPath 删除路径
- * @param {Object} [baseDir=Documet] 项目数据
- * @returns {Promise<Object>}
- */
-function delFile(delPath, baseDir = proxy.$BaseDirectory.Document) {
-	return new Promise((resolve, reject) => {
-		try {
-			// 写入文件 这里的需要转字符串再写入
-			const remRes = proxy.$remove(delPath, { baseDir: baseDir })
-			// 删除成功 返回结果
-			if (remRes) resolve({ code: 0, msg: "Delete success √" })
-		} catch (error) {
-			reject({ code: 1, msg: "Delete failed ×", error })
-		}
-	})
-}
-
-/**
- * 打开文件选择对话框
- * @param {Boolean} [isMultiple=false] 是否允许多选
- * @param {Boolean} [isDir=false] 是否选择目录
- * @param {Options} [options=[]] 文件筛选配置
- * @returns {Promise<String>}
- * @example
- * ```javascript
- * const filesPath = openFileSelect(false, false, [{
- *     name: "筛选器名称",
- *     extensions: ['png','svg','jpg'],
- * }])
- *
- * console.log(filesPath)
- * ```
- */
-function openFileSelect(isMultiple = false, isDir = false, options = []) {
-	return new Promise(async (resolve, reject) => {
-		try {
-			const files = await proxy.$OpenFile({
-				multiple: isMultiple,
-				directory: isDir,
-				filters: options,
-			})
-			resolve(files)
-		} catch (error) {
-			reject(error)
-		}
-	})
 }
 </script>
 
@@ -880,25 +772,71 @@ function openFileSelect(isMultiple = false, isDir = false, options = []) {
 				justify-content: center;
 				align-items: center;
 
-				.el-icon {
-					width: 65px;
-					height: 65px;
-					border-radius: 5px;
-					background-color: #d9d9d9;
-					font-size: 30px;
-					color: #ffffff;
+				.add-Proimg {
+					width: 70px;
+					height: 70px;
+					display: flex;
+					border: 1px dashed transparent;
+					align-items: center;
+					justify-content: center;
+					border-radius: 6px;
+					position: relative;
+					overflow: hidden;
+
+					.el-image {
+						width: 100%;
+						height: 100%;
+						object-fit: cover;
+						border-radius: 6px;
+					}
+
+					.image-actions {
+						position: absolute;
+						width: 100%;
+						height: 100%;
+						border-radius: 6px;
+						background-color: var(--el-overlay-color-lighter);
+						transition: opacity var(--el-transition-duration);
+
+						.actions-icon {
+							width: 100%;
+							height: 100%;
+							display: flex;
+							justify-content: center;
+							align-items: center;
+
+							.el-icon {
+								padding: 5px;
+								color: #ffffff;
+								cursor: pointer;
+								&:hover {
+									opacity: 0.7;
+								}
+							}
+						}
+					}
 				}
 
-				.el-avatar {
-					margin: auto;
+				.add-image {
+					border: 1px dashed #dcdfe6;
+					transition: opacity var(--el-transition-duration);
+					opacity: 1;
+					&:hover {
+						border: 1px dashed #409eff;
+						cursor: pointer;
+					}
+
+					.add-buttom {
+						width: 100%;
+						height: 100%;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
 				}
 
 				.text {
 					margin-top: 5px;
-				}
-
-				.el-icon:hover {
-					font-size: 35px;
 				}
 			}
 

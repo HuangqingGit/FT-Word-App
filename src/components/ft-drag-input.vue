@@ -16,13 +16,13 @@
 				</div>
 				<div class="he-Edit">
 					<el-switch v-model="element.isList" inline-prompt active-text="列表" inactive-text="单项" :before-change="switchBefore" />
-					<el-icon v-if="!library" class="del" @click="$emit('delItem', element)"><ft-ep-delete /></el-icon>
+					<el-icon v-if="!library" class="del" @click="$emit('delItem', element, 'ponent')"><ft-ep-delete /></el-icon>
 					<el-icon v-if="!library" class="move"><ft-ep-Rank /></el-icon>
 				</div>
 			</template>
 			<div class="item-single" v-if="!element.isList">
 				<el-input
-					v-model="element.data"
+					v-model="curInputVal"
 					type="textarea"
 					resize="none"
 					:autosize="{ minRows: 1, maxRows: 10 }"
@@ -44,7 +44,7 @@
 						</template>
 					</draggable>
 					<div class="list-buttom-footer">
-						<el-button v-if="element.isList" @click="$emit('addItem', element)" :disabled="library">
+						<el-button v-if="element.isList" @click="$emit('addItem', element, 'input')" :disabled="library">
 							<el-icon class="el-icon--left"><ft-ep-plus /></el-icon>添加项
 						</el-button>
 					</div>
@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from "vue"
+import { ref, watch, nextTick, onMounted } from "vue"
 import { ElMessageBox, ElMessage } from "element-plus"
 import { useMenuStore } from "../stores/index"
 import { writeText } from "@tauri-apps/plugin-clipboard-manager"
@@ -79,6 +79,7 @@ const props = defineProps({
 const MenuStore = useMenuStore()
 const isEditName = ref(false)
 const nameInput = ref(null)
+const curInputVal = ref("")
 const dragOptions = {
 	animation: 300,
 	handle: ".input_anchor",
@@ -94,6 +95,11 @@ watch(isEditName, (newVal) => {
 		})
 	}
 })
+// 监听单项输入框的变化
+watch(curInputVal, (newVal) => (props.element.data = newVal))
+
+// ===================== 启动 =====================
+onMounted(() => (curInputVal.value = props.element.data))
 
 // ===================== 方法 =====================
 /**
@@ -113,20 +119,25 @@ function copyAttrID(isList, copyValue) {
 function switchBefore() {
 	return new Promise((resolve, reject) => {
 		if (props.element.isList) {
-			ElMessageBox.confirm("切换成单项模式将清除当前列表！确认继续？", {
-				title: "组件模式切换",
-				confirmButtonText: "确认",
-				cancelButtonText: "取消",
-				showClose: false,
-				type: "warning",
-			})
-				.then(() => {
-					resolve(true)
-					props.element.data = null
+			if (props.element.data.length <= 1) {
+				resolve(true)
+				curInputVal.value = ""
+			} else {
+				ElMessageBox.confirm("切换成单项模式将清除当前列表！确认继续？", {
+					title: "组件模式切换",
+					confirmButtonText: "确认",
+					cancelButtonText: "取消",
+					showClose: false,
+					type: "warning",
 				})
-				.catch(() => {
-					reject(false)
-				})
+					.then(() => {
+						resolve(true)
+						curInputVal.value = ""
+					})
+					.catch(() => {
+						reject(false)
+					})
+			}
 		} else {
 			resolve(true)
 			props.element.data = [{ id: crypto.randomUUID(), value: null }]
