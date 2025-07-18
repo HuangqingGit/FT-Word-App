@@ -1,6 +1,6 @@
 <template>
 	<div :class="src === '' ? 'single-image-preview add-image-preview' : 'single-image-preview'" @mouseenter="showActions = true" @mouseleave="showActions = false">
-		<el-image ref="imageRef" v-if="src" :hide-on-click-modal="true" :preview-teleported="true" :src="src" :preview-src-list="[src]" fit="cover" />
+		<el-image ref="imageRef" v-if="src" :hide-on-click-modal="true" :preview-teleported="true" :src="imageUrl" :preview-src-list="[imageUrl]" fit="cover" />
 		<transition v-if="src" name="el-fade-in-linear">
 			<div class="image-actions" v-show="showActions">
 				<div class="actions-icon">
@@ -16,8 +16,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import { useMenuStore } from "../stores/index"
+import { ref, watch, onMounted } from "vue"
 
 // ==================== Props变量 =====================
 const props = defineProps({
@@ -28,6 +27,17 @@ const props = defineProps({
 // ======================= 变量 =======================
 const showActions = ref(false) //移入移出状态
 const imageRef = ref(null)
+const imageUrl = ref("")
+
+// 监听父组件传递的Src属性变化
+watch(
+	() => props.src,
+	(newVal) => (imageUrl.value = typeof newVal === "string" ? newVal : "")
+)
+// 启动时赋值显示图片
+onMounted(() => {
+	imageUrl.value = typeof props.src === "string" ? props.src : ""
+})
 
 // ======================= 方法 =======================
 // 预览图片
@@ -47,6 +57,7 @@ function previewImage() {
 	height: 100%;
 	max-height: 220px;
 	overflow: hidden;
+	margin: 0 10px;
 
 	.el-image {
 		width: 100%;

@@ -1,13 +1,14 @@
 <template>
 	<div class="darg-input">
 		<el-card shadow="hover" body-class="body-style" header-class="header-style" footer-class="footer-style">
+			<!-- 卡片页眉 -->
 			<template #header>
 				<div class="he-left">
-					<div class="card-name" v-if="!isEditName" @dblclick="!library ? (isEditName = true) : ''">{{ element.name }}</div>
+					<div class="card-name" v-if="!isEditName" @dblclick="!library ? (isEditName = true) : ''">{{ itemData.name }}</div>
 					<el-input
 						class="nameInput"
 						ref="nameInput"
-						v-model="element.name"
+						v-model="itemData.name"
 						v-if="isEditName"
 						placeholder="当前数据项的名称"
 						@keyup.enter="$refs.nameInput.blur()"
@@ -15,47 +16,57 @@
 					/>
 				</div>
 				<div class="he-Edit">
-					<el-switch v-model="element.isList" inline-prompt active-text="列表" inactive-text="单项" :before-change="switchBefore" />
-					<el-icon v-if="!library" class="del" @click="$emit('delItem', element, 'ponent')"><ft-ep-delete /></el-icon>
+					<el-switch v-model="itemData.isList" inline-prompt active-text="列表" inactive-text="单项" :before-change="switchBefore" />
+					<el-icon v-if="!library" class="del" @click="$emit('delItem', itemData)"><ft-ep-delete /></el-icon>
 					<el-icon v-if="!library" class="move"><ft-ep-Rank /></el-icon>
 				</div>
 			</template>
-			<div class="item-single" v-if="!element.isList">
+
+			<!-- 单项组件 -->
+			<div class="item-single" v-if="!itemData.isList">
 				<el-input
 					v-model="curInputVal"
 					type="textarea"
 					resize="none"
-					:autosize="{ minRows: 1, maxRows: 10 }"
-					:placeholder="library ? '将组件拖至编辑区进行编辑' : 'Enter current item data'"
-					:disabled="library"
+					placeholder="Enter current item data"
+					:autosize="{ minRows: 4, maxRows: 10 }"
+					@blur="$emit('update-data', JSON.parse(JSON.stringify(curInputVal)))"
 				/>
 			</div>
-			<div class="item-list" v-if="element.isList">
+			<!-- 列表组件 -->
+			<div class="item-list" v-if="itemData.isList">
 				<el-scrollbar>
-					<draggable v-model="element.data" v-bind="dragOptions" item-key="id">
+					<draggable v-model="curInputList" v-bind="dragOptions" item-key="id">
 						<template #item="{ element: item, index }">
 							<div class="item">
 								<el-icon class="input_anchor"><ft-ep-DCaret /></el-icon>
-								<el-input v-model="item.value" :placeholder="library ? '将组件拖至编辑区进行编辑' : 'Enter current item data'" :disabled="library">
+								<el-input v-model="item.value" placeholder="Enter current item data" @blur="$emit('update-data', JSON.parse(JSON.stringify(curInputList)))">
 									<template #prepend>{{ index + 1 }}</template>
 								</el-input>
-								<el-icon class="input_delete" @click="$emit('delItem', element, item)" v-if="element.data.length > 1"><ft-ep-delete /></el-icon>
+								<el-icon class="input_delete" @click="onDelete(item)" v-if="curInputList.length > 1"><ft-ep-delete /></el-icon>
 							</div>
 						</template>
 					</draggable>
 					<div class="list-buttom-footer">
-						<el-button v-if="element.isList" @click="$emit('addItem', element, 'input')" :disabled="library">
+						<el-button v-if="itemData.isList" @click="onAddItem">
 							<el-icon class="el-icon--left"><ft-ep-plus /></el-icon>添加项
 						</el-button>
 					</div>
 				</el-scrollbar>
 			</div>
 
+			<!-- 卡片页脚 -->
 			<template #footer>
 				<div class="add_footer">
-					<div class="attr-id" @click="copyAttrID(element.isList, MenuStore.uuidToAttrID(element.id))">
-						<span>AttrID：{{ MenuStore.uuidToAttrID(element.id) }} </span>
+					<!-- 复制参数（数据区生效） -->
+					<div v-if="!library" class="attr-id" @click="copyAttrID(itemData.isList, MenuStore.uuidToAttrID(itemData.id))">
+						<span>ATTRID：{{ MenuStore.uuidToAttrID(itemData.id) }} </span>
 						<el-icon><ft-ep-DocumentCopy /></el-icon>
+					</div>
+					<!-- 组件区提示信息 -->
+					<div v-if="library" class="prompt-msg">
+						<el-icon> <ft-ep-Document /></el-icon>
+						<span>向文档中插入一段文本或一个文本列表</span>
 					</div>
 				</div>
 			</template>
@@ -71,7 +82,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager"
 
 // ===================== Props =====================
 const props = defineProps({
-	element: Object,
+	itemData: Object,
 	library: Boolean,
 })
 
@@ -80,28 +91,38 @@ const MenuStore = useMenuStore()
 const isEditName = ref(false)
 const nameInput = ref(null)
 const curInputVal = ref("")
+const curInputList = ref([])
 const dragOptions = {
 	animation: 300,
 	handle: ".input_anchor",
 	ghostClass: "list-ghost-style",
 }
+const emits = defineEmits(["update-data", "addItem", "delItem"])
 
 // ===================== 监听 =====================
-// 监听名称编辑事件
+// 卡片名称编辑事件
 watch(isEditName, (newVal) => {
-	if (newVal) {
-		nextTick(() => {
-			nameInput.value && nameInput.value.select()
-		})
-	}
+	if (newVal) nextTick(() => nameInput.value && nameInput.value.select())
 })
-// 监听单项输入框的变化
-watch(curInputVal, (newVal) => (props.element.data = newVal))
 
 // ===================== 启动 =====================
-onMounted(() => (curInputVal.value = props.element.data))
+onMounted(() => {
+	// 组件加载时深度克隆一份父组件的数据
+	if (props.itemData.isList) curInputList.value = JSON.parse(JSON.stringify(props.itemData.data))
+	if (!props.itemData.isList) curInputVal.value = JSON.parse(JSON.stringify(props.itemData.data))
+})
 
 // ===================== 方法 =====================
+// 删除列表项
+function onDelete(item) {
+	curInputList.value = curInputList.value.filter((i) => !(i.id === item.id))
+	emits("update-data", JSON.parse(JSON.stringify(curInputList.value)))
+}
+// 添加列表项
+function onAddItem() {
+	curInputList.value.push({ id: crypto.randomUUID(), value: "" })
+}
+
 /**
  * 向剪贴板写入数据
  * @param {Boolean} isList
@@ -109,7 +130,7 @@ onMounted(() => (curInputVal.value = props.element.data))
  */
 function copyAttrID(isList, copyValue) {
 	writeText(isList ? `{%for item in ${copyValue}%}{{item}}{%if not loop.last%}\n{%endif%}{%endfor%}` : `{{${copyValue}}}`)
-	ElMessage({ type: "success", message: `AttrID：${copyValue} 组件数据编码已复制`, plain: true, offset: 85, grouping: true })
+	ElMessage({ type: "success", message: `ATTRID：${copyValue} 组件数据编码已复制`, plain: true, offset: 85, grouping: true })
 }
 
 /**
@@ -118,10 +139,11 @@ function copyAttrID(isList, copyValue) {
  */
 function switchBefore() {
 	return new Promise((resolve, reject) => {
-		if (props.element.isList) {
-			if (props.element.data.length <= 1) {
+		if (props.itemData.isList) {
+			if (props.itemData.data.length <= 1) {
 				resolve(true)
-				curInputVal.value = ""
+				curInputVal.value = "" // 清空输入框
+				nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curInputVal.value))))
 			} else {
 				ElMessageBox.confirm("切换成单项模式将清除当前列表！确认继续？", {
 					title: "组件模式切换",
@@ -132,7 +154,8 @@ function switchBefore() {
 				})
 					.then(() => {
 						resolve(true)
-						curInputVal.value = ""
+						curInputVal.value = "" // 清空输入框
+						emits("update-data", JSON.parse(JSON.stringify(curInputVal.value)))
 					})
 					.catch(() => {
 						reject(false)
@@ -140,7 +163,8 @@ function switchBefore() {
 			}
 		} else {
 			resolve(true)
-			props.element.data = [{ id: crypto.randomUUID(), value: null }]
+			curInputList.value = [{ id: crypto.randomUUID(), value: null }]
+			nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curInputList.value))))
 		}
 	})
 }
@@ -152,6 +176,7 @@ function switchBefore() {
 
 	.el-card {
 		height: 100%;
+		max-height: 333px;
 		display: flex;
 		flex-direction: column;
 
@@ -276,15 +301,27 @@ function switchBefore() {
 
 				.attr-id {
 					font-size: 11px;
-					color: #dcdfe6;
+					color: #c0c4cc;
 					display: flex;
 					align-items: center;
 					gap: 5px;
+					&:hover {
+						cursor: pointer;
+						color: #409eff;
+					}
 				}
 
-				.attr-id:hover {
-					cursor: pointer;
-					color: #cdd0d6;
+				.prompt-msg {
+					display: flex;
+					align-items: center;
+					width: 100%;
+					font-size: 12px;
+					color: #606266;
+
+					.el-icon {
+						font-size: 15px;
+						margin-right: 5px;
+					}
 				}
 			}
 		}

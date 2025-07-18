@@ -1,13 +1,14 @@
 <template>
 	<div class="darg-image">
 		<el-card shadow="hover" body-class="body-style" header-class="header-style" footer-class="footer-style">
+			<!-- 卡片页眉 -->
 			<template #header>
 				<div class="he-left">
-					<div class="card-name" v-if="!isEditName" @dblclick="!library ? (isEditName = true) : ''">{{ element.name }}</div>
+					<div class="card-name" v-if="!isEditName" @dblclick="!library ? (isEditName = true) : ''">{{ itemData.name }}</div>
 					<el-input
 						class="nameInput"
 						ref="nameInput"
-						v-model="element.name"
+						v-model="itemData.name"
 						v-if="isEditName"
 						placeholder="当前数据项的名称"
 						@keyup.enter="$refs.nameInput.blur()"
@@ -15,31 +16,39 @@
 					/>
 				</div>
 				<div class="he-Edit">
-					<el-switch v-model="element.isList" inline-prompt active-text="列表" inactive-text="单项" :before-change="switchBefore" />
-					<el-icon v-if="!library" class="del" @click="$emit('delItem', element, 'ponent')"><ft-ep-delete /></el-icon>
+					<el-switch v-model="itemData.isList" inline-prompt active-text="列表" inactive-text="单项" :before-change="switchBefore" />
+					<el-icon v-if="!library" class="del" @click="$emit('delItem', itemData)"><ft-ep-delete /></el-icon>
 					<el-icon v-if="!library" class="move"><ft-ep-Rank /></el-icon>
 				</div>
 			</template>
-			<!-- 单项 -->
-			<div class="item-single" v-if="!element.isList">
-				<ft-single-image-preview :src="element.data" :library="library" @addItem="$emit('addItem', element, 'image')" @delItem="$emit('delItem', element, 'image')" />
+
+			<!-- 单项组件 -->
+			<div class="item-single" v-if="!itemData.isList">
+				<ft-single-image-preview :src="curImageUrl" :library="library" @addItem="onAddItem('image')" @delItem="onDelItem('image')" />
 			</div>
-			<!-- 列表 -->
-			<div class="item-list" v-if="element.isList">
+			<!-- 列表组件 -->
+			<div class="item-list" v-if="itemData.isList">
 				<el-scrollbar>
-					<draggable class="darg-image-item" v-model="element.data" v-bind="{ animation: 300, handle: '.darg-handle' }" item-key="id" :move="onMove">
+					<draggable class="darg-image-item" v-model="curImageList" v-bind="{ animation: 300, handle: '.darg-handle' }" item-key="id" :move="onMove">
 						<template #item="{ element: item, index }">
-							<ft-image-preview :src="item" :list="imgList" :index="index" :library="library" @addItem="$emit('addItem', element, 'images')" @delItem="$emit('delItem', element, item)" />
+							<ft-image-preview :src="item" :list="imgList" :index="index" :library="library" @addItem="onAddItem('images')" @delItem="onDelItem(index)" />
 						</template>
 					</draggable>
 				</el-scrollbar>
 			</div>
 
+			<!-- 卡片页脚 -->
 			<template #footer>
 				<div class="add_footer">
-					<div class="attr-id" @click="copyAttrID(element.isList, MenuStore.uuidToAttrID(element.id))">
-						<span>AttrID：{{ MenuStore.uuidToAttrID(element.id) }} </span>
+					<!-- 复制参数（数据区生效） -->
+					<div v-if="!library" class="attr-id" @click="copyAttrID(itemData.isList, MenuStore.uuidToAttrID(itemData.id))">
+						<span>ATTRID：{{ MenuStore.uuidToAttrID(itemData.id) }} </span>
 						<el-icon><ft-ep-DocumentCopy /></el-icon>
+					</div>
+					<!-- 组件区提示信息 -->
+					<div v-if="library" class="prompt-msg">
+						<el-icon> <ft-ep-Document /></el-icon>
+						<span>向文档中插入一张图片或一个图片列表</span>
 					</div>
 				</div>
 			</template>
@@ -48,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, computed } from "vue"
+import { ref, watch, nextTick, computed, onMounted } from "vue"
 import { ElMessageBox, ElMessage } from "element-plus"
 import { useMenuStore } from "../stores/index"
 import { writeText } from "@tauri-apps/plugin-clipboard-manager"
@@ -57,7 +66,7 @@ import ftSingleImagePreview from "./ft-single-image-preview.vue"
 
 // ===================== Props =====================
 const props = defineProps({
-	element: Object,
+	itemData: Object,
 	library: Boolean,
 })
 
@@ -65,23 +74,78 @@ const props = defineProps({
 const MenuStore = useMenuStore() // Vue pinia 共享数据
 const isEditName = ref(false) // 组件名编辑状态
 const nameInput = ref(null) // 组件名Value值
-// 计算属性：组件预览图列表
+const curImageUrl = ref("")
+const curImageList = ref([])
+// 计算属性：组件预览图列表,筛出"add-image"标记元素，用于展示预览列表
 const imgList = computed(() => {
-	if (!props.element.isList) return [] // data数据不是列表
-	return props.element.data.filter((i) => i.value !== "add-image").map((i) => i.value)
+	return curImageList.value.filter((i) => i.value !== "add-image").map((i) => i.value)
+})
+const emits = defineEmits(["update-data", "addItem", "delItem"])
+
+// ===================== 启动 =====================
+onMounted(() => {
+	// 组件加载时深度克隆一份父组件的数据
+	if (props.itemData.isList) curImageList.value = JSON.parse(JSON.stringify(props.itemData.data))
+	if (!props.itemData.isList) curImageUrl.value = JSON.parse(JSON.stringify(props.itemData.data))
 })
 
 // ===================== 监听 =====================
-// 监听名称编辑事件
+// 卡片名称编辑事件
 watch(isEditName, (newVal) => {
-	if (newVal) {
-		nextTick(() => {
-			nameInput.value && nameInput.value.select()
-		})
-	}
+	if (newVal) nextTick(() => nameInput.value && nameInput.value.select())
+})
+// 图片列表变化事件
+watch(curImageList, () => {
+	nextTick(() => nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curImageList.value)))))
 })
 
 // ===================== 方法 =====================
+
+/**
+ * 添加Item
+ * @param {Steing} type element组件类型
+ * @returns {Null}
+ */
+async function onAddItem(type) {
+	const multiple = type === "image" ? false : true // 根据条件设置是否允许多选
+	const imgs = await MenuStore.openFileSelect(multiple, false, [{ name: "Image", extensions: ["png", "jpg", "jpeg", "bmp", "webp", "icon", "ico", "gif"] }])
+	// 用户取消选择
+	if (imgs === null) return
+	// 单项选择
+	if (type === "image") {
+		curImageUrl.value = MenuStore.uint8ArrayToBase64(await MenuStore.readFile(imgs))
+		emits("update-data", JSON.parse(JSON.stringify(curImageUrl.value)))
+	}
+	// 列表选择
+	if (type === "images") {
+		// 使用Promise.all等待所有图片处理完成
+		const imagePromises = imgs.map(async (img) => {
+			const base64 = MenuStore.uint8ArrayToBase64(await MenuStore.readFile(img))
+			return { id: crypto.randomUUID(), value: base64 }
+		})
+
+		const newImages = await Promise.all(imagePromises)
+		// 插入到倒数第二个位置
+		curImageList.value.splice(curImageList.value.length - 1, 0, ...newImages)
+
+		// 等待nextTick确保DOM更新后再触发事件
+		nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curImageList.value))))
+	}
+}
+
+/**
+ * 删除Item
+ * @param {Object|undefined} item
+ * @returns {Null}
+ */
+function onDelItem(type) {
+	// 删除图片
+	if (type === "image") curImageUrl.value = ""
+	// 删除列表数据
+	if (typeof type === "number") curImageList.value.splice(type, 1)
+	// 通知父组件更新数据
+	nextTick(() => emits("update-data", JSON.parse(JSON.stringify(type === "image" ? curImageUrl.value : curImageList.value))))
+}
 
 /**
  * 图片拖拽排序钩子函数，用于处理不可拖拽函数的排序操作
@@ -91,7 +155,7 @@ watch(isEditName, (newVal) => {
 function onMove(evt) {
 	if (evt.draggedContext.element.value === "add-image") return false
 	const relatedIndex = evt.relatedContext.index
-	const arr = props.element.data
+	const arr = props.itemData.data
 	if (relatedIndex >= arr.length - 1) return false
 	return true
 }
@@ -103,7 +167,7 @@ function onMove(evt) {
  */
 function copyAttrID(isList, copyValue) {
 	writeText(isList ? `{%for item in ${copyValue}%}{{item}}{%if not loop.last%}\n{%endif%}{%endfor%}` : `{{${copyValue}}}`)
-	ElMessage({ type: "success", message: `AttrID：${copyValue} 组件数据编码已复制`, plain: true, offset: 85, grouping: true })
+	ElMessage({ type: "success", message: `ATTRID：${copyValue} 组件数据编码已复制`, plain: true, offset: 85, grouping: true })
 }
 
 /**
@@ -112,10 +176,11 @@ function copyAttrID(isList, copyValue) {
  */
 function switchBefore() {
 	return new Promise((resolve, reject) => {
-		if (props.element.isList) {
-			if (props.element.data.length <= 1) {
+		if (props.itemData.isList) {
+			if (props.itemData.data.length <= 2) {
 				resolve(true)
-				props.element.data = ""
+				curImageUrl.value = "" // 清空图片
+				nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curImageUrl.value))))
 			} else {
 				ElMessageBox.confirm("切换成单项模式将清除当前列表！确认继续？", {
 					title: "组件模式切换",
@@ -126,7 +191,8 @@ function switchBefore() {
 				})
 					.then(() => {
 						resolve(true)
-						props.element.data = ""
+						curImageUrl.value = "" // 清空图片
+						emits("update-data", JSON.parse(JSON.stringify(curImageUrl.value)))
 					})
 					.catch(() => {
 						reject(false)
@@ -134,7 +200,8 @@ function switchBefore() {
 			}
 		} else {
 			resolve(true)
-			props.element.data = [{ id: crypto.randomUUID(), value: "add-image" }]
+			curImageList.value = [{ id: crypto.randomUUID(), value: "add-image" }]
+			nextTick(() => emits("update-data", JSON.parse(JSON.stringify(curImageList.value))))
 		}
 	})
 }
@@ -146,6 +213,7 @@ function switchBefore() {
 
 	.el-card {
 		height: 100%;
+		max-height: 333px;
 		display: flex;
 		flex-direction: column;
 
@@ -207,7 +275,7 @@ function switchBefore() {
 			flex: 1;
 			display: grid;
 			grid-template-rows: 1fr;
-			padding: 10px !important;
+			padding: 10px 0 !important;
 
 			.item-single {
 				display: flex;
@@ -218,11 +286,15 @@ function switchBefore() {
 			.item-list {
 				max-height: 220px;
 
-				.darg-image-item {
-					display: grid;
-					grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-					gap: 8px;
-					padding: 10px;
+				.el-scrollbar {
+					padding: 0;
+
+					.darg-image-item {
+						display: grid;
+						grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+						gap: 8px;
+						padding: 0 10px;
+					}
 				}
 			}
 		}
@@ -237,15 +309,27 @@ function switchBefore() {
 
 				.attr-id {
 					font-size: 11px;
-					color: #dcdfe6;
+					color: #c0c4cc;
 					display: flex;
 					align-items: center;
 					gap: 5px;
+					&:hover {
+						cursor: pointer;
+						color: #409eff;
+					}
 				}
 
-				.attr-id:hover {
-					cursor: pointer;
-					color: #cdd0d6;
+				.prompt-msg {
+					display: flex;
+					align-items: center;
+					width: 100%;
+					font-size: 12px;
+					color: #606266;
+
+					.el-icon {
+						font-size: 15px;
+						margin-right: 5px;
+					}
 				}
 			}
 		}

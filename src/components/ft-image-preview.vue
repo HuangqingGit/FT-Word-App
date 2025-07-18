@@ -32,7 +32,7 @@ import { ref, onMounted } from "vue"
 
 // ==================== Props变量 =====================
 const props = defineProps({
-	src: Object,
+	src: null,
 	list: Array,
 	index: Number,
 })
@@ -68,7 +68,7 @@ onMounted(() => {
 		top: 0;
 		width: 35px;
 		height: 20px;
-		background: #409eff;
+		background-color: #409eff;
 		color: #fff;
 		font-size: 12px;
 		text-align: center;

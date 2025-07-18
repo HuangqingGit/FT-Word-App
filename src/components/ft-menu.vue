@@ -8,7 +8,7 @@
 					<span>{{ tooltipText }}</span>
 				</template>
 			</el-tooltip>
-			<el-icon @mouseleave="removTooltip" @mouseenter="triggerTooltip($event, '创建分类')" @click="createClass"><ft-ep-DocumentAdd /></el-icon>
+			<el-icon :class="!menuList.length ? 'disabled' : ''" @mouseleave="removTooltip" @mouseenter="triggerTooltip($event, '创建分类')" @click="createClass"><ft-ep-DocumentAdd /></el-icon>
 			<el-dropdown placement="bottom-start" trigger="click">
 				<span class="el-dropdown" @click="stopTooltipShow">
 					<el-icon @mouseleave="removTooltip" @mouseenter="triggerTooltip($event, '新建项目')"><ft-ep-FolderAdd /></el-icon>
@@ -32,8 +32,8 @@
 
 		<!-- Menu-目录 -->
 		<el-scrollbar>
-			<el-menu class="el-menu-vertical" ref="ftElMenu" :default-openeds="curOpeneds" :default-active="curActive" @select="curActive = $event">
-				<el-sub-menu @contextmenu="onContext($event, [index])" :index="item.index.toString()" v-for="(item, index) in menuList" :key="index">
+			<el-menu class="el-menu-vertical" ref="ftElMenu" :default-active="curActive" @select="curActive = $event">
+				<el-sub-menu :key="index" :index="item.index.toString()" v-for="(item, index) in menuList" @contextmenu="onContext($event, [index])" @click="setFatherID(item.index.toString())">
 					<template #title>
 						<el-avatar :src="item.icon" :size="32" @error="true">
 							<img src="https://img.kuckji.cn/i/2025/06/17/6850dc498d658.png" />
@@ -43,7 +43,6 @@
 					<el-menu-item
 						v-for="(child, childIndex) in item.children"
 						@dblclick="dblclick(child, `${item.index}-${childIndex}`)"
-						@click="menuItemClick(item, child)"
 						@contextmenu="onContext($event, [index, childIndex], item.index)"
 						:index="item.index + '-' + childIndex"
 						:key="childIndex"
@@ -162,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue"
+import { ref, watch, onMounted, nextTick } from "vue"
 import { useMenuStore } from "../stores/index"
 import { ElMessageBox, ElMessage, ElLoading } from "element-plus"
 
@@ -197,15 +196,14 @@ const isDisableDel = ref(false) // 是否禁用删除选项
 const formerName = ref(null) // 子菜单的曾用名
 const parentIndex = ref(null) // 选中的父级菜单索引
 const curMenuIndex = ref([]) // 当前选中菜单索引
-const curOpeneds = ref([]) // 打开的菜单列表
-const curActive = ref(window.sessionStorage.getItem("curActive")) // 当前激活的菜单
+const curActive = ref(window.sessionStorage.getItem("FT-CUR-ACTIVE")) // 当前激活的菜单
 const menuList = ref([]) // 菜单目录列表
 
 // ===================== Vue监听 =====================
 watch(projectName, (newVal) => editAuxFun(newVal))
 watch(projectImgBase64, () => editAuxFun(projectName.value))
 watch(curActive, (newVal) => {
-	window.sessionStorage.setItem("curActive", newVal)
+	window.sessionStorage.setItem("FT-CUR-ACTIVE", newVal)
 	menuAuxiliary()
 })
 
@@ -224,6 +222,11 @@ onMounted(() => getProjectList())
 
 // ===================== 方法 =====================
 
+// 设置一级目录ID
+function setFatherID(id) {
+	window.sessionStorage.setItem("FT-FATHER", id)
+}
+
 // 目录菜单激活关联事件辅助函数
 function menuAuxiliary() {
 	const ar = curActive.value.split("-") // 分割菜单ID
@@ -231,12 +234,6 @@ function menuAuxiliary() {
 	if (!it.length) return // 符合匹配条件的菜单目录为空时
 	MenuStore.setActivaLevel({ name: it[0].name, index: it[0].index, prefix: it[0].prefix, fileName: it[0].fileName, icon: it[0].icon }) // 向Store写入一级目录信息
 	MenuStore.setActivaMenu(it[0].children[ar[1]]) // 显示当前选中菜单的数据
-}
-
-// 子菜单Click事件
-function menuItemClick(menu, item) {
-	MenuStore.setActivaLevel({ name: menu.name, index: menu.index, prefix: menu.prefix, fileName: menu.fileName, icon: menu.icon })
-	MenuStore.setActivaMenu(item)
 }
 
 // 编辑项目辅助函数
@@ -256,22 +253,35 @@ function editAuxFun(name) {
 
 // 创建项目分类
 function createClass() {
-	// 如果sessionStorage中不存在Active值，则默认选择第一项进行添加
-	if (window.sessionStorage.getItem("curActive") === null && menuList.value.length > 0) {
-		curActive.value = `${menuList.value[0].index}-0`
+	// 如果目录为空则不允许创建分类，直接退出
+	if (!menuList.value.length) return
+	// 获取 sessionStorage 的数据
+	let fatherId = window.sessionStorage.getItem("FT-FATHER")
+	// 如果读取结果为空/null，且目录数据不为空时
+	if (fatherId === null && menuList.value.length > 0) {
+		setFatherID(menuList.value[0].index) // 写入第一项的ID
+		fatherId = menuList.value[0].index // 从新赋值第一项ID
 	}
-	// 获取当前激活目录的索引
-	const curActiveMenu = curActive.value.split("-")
-	// 获取当前激活的目录对象
-	const curMenu = menuList.value.find((item) => item.index == curActiveMenu[0])
 	// 设置曾用名
-	formerName.value = "新建分类"
+	formerName.value = ""
+	// 获取当前激活的目录对象
+	const curMenu = menuList.value.find((item) => item.index == fatherId)
 	// 插入数据
 	curMenu.children.unshift({ name: formerName.value, datas: [], isEdit: true })
-	// 设置原来选中的激活对象
-	curActive.value = `${curActiveMenu[0]}-${Number(curActiveMenu[1]) + 1}`
-	// 10ms后选中Input中的内容
-	setTimeout(() => proxy.$refs[`${curActiveMenu[0]}-0`][0].select(), 10)
+	// 获取当前激活目录的索引
+	let curActiveMenu = null
+	if (curActive.value) curActiveMenu = curActive.value.split("-") // 已有激活菜单时
+	// 展开目录
+	if (curActive.value) {
+		// 选中的一级菜单ID和最小触发的一及菜单相同才执行
+		if (fatherId === curActiveMenu[0]) curActive.value = `${curActiveMenu[0]}-${Number(curActiveMenu[1]) + 1}`
+	} else {
+		// session为空时默认选中第一项
+		curActive.value = `${fatherId}-1`
+	}
+	// 等待 DOM 更新后选中Input
+
+	nextTick(() => proxy.$refs[`${fatherId}-0`][0].select())
 }
 
 // dialog 关闭事件
@@ -472,8 +482,8 @@ function dblclick(item, index) {
 	item.isEdit = true
 	// 保存曾用名
 	formerName.value = item.name
-	// 10ms后选中Input中的内容
-	setTimeout(() => proxy.$refs[index][0].select(), 10)
+	// 等待 DOM 更新后选中Input中的内容
+	nextTick(() => proxy.$refs[index][0].select())
 }
 
 /**
@@ -484,13 +494,26 @@ function dblclick(item, index) {
  * @returns {Null} 无返回值
  */
 function blurClass(name, item, index) {
-	let fileName = `${dirPath}/${item.fileName}` // 获取当前选择项目的文件名
+	// 获取当前激活目录的索引
+	const curActiveMenu = curActive.value.split("-")
+	// 判断输入的分类名称是否为空字符串
+	if (item.children[index].name === "" && formerName.value === "") {
+		curActive.value = curActive.value ? `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}` : `${fatherId}-1`
+		return item.children.shift() // 删除第一项数据
+	}
+	// 获取当前选择项目的文件名
+	let fileName = `${dirPath}/${item.fileName}`
 	item.children[index].isEdit = false
 	const verRes = validateName(name)
 	// 格式校验不通过
 	if (typeof verRes === "string") {
 		// 提示错误信息
 		ElMessage({ type: "warning", message: `分类名称不符合命名规范：${verRes}`, plain: true, offset: 85, grouping: true })
+		// 判断是否创建分类时的名称不符合规范
+		if (formerName.value === "") {
+			curActive.value = curActive.value ? `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}` : `${fatherId}-1`
+			return item.children.shift() // 删除第一项数据
+		}
 		// 刷新菜单列表
 		item.children[index].name = formerName.value
 	}
@@ -619,6 +642,8 @@ function menuOptionsEvent(re_type) {
 							if ((projectData.index == curActiveIndex[0] && index[1] == curActiveIndex[1] && index[1] == delLength) || index[1] < curActiveIndex[1]) {
 								curActive.value = `${curActiveIndex[0]}-${curActiveIndex[1] - 1}`
 							}
+							// 显示当前激活的菜单数据
+							menuAuxiliary()
 						})
 						.catch(() => {})
 				}
@@ -645,7 +670,7 @@ function menuOptionsEvent(re_type) {
 						menuList.value.splice(index[0], 1)
 						ElMessage({ type: "success", message: "删除成功", plain: true, offset: 85, grouping: true })
 						// 删除项目后，如果被删除的一级目录是被激活的目录，则清理sessionStorage中缓存的数据
-						if (curActiveIndex[0] == projectData.index) window.sessionStorage.removeItem("curActive")
+						if (curActiveIndex[0] == projectData.index) window.sessionStorage.removeItem("FT-CUR-ACTIVE")
 					})
 					.catch(() => {})
 				break
@@ -677,8 +702,8 @@ function menuOptionsEvent(re_type) {
 				projectPrefix.value = projectData.prefix
 				isEditPrefix.value = false
 				isShowDialog.value = true
-				// 由于事件监听原因会动态刷新Confirm可点击状态，所以延迟10ms将Confirm按键设为不可点击状态，如用户没有修改项目则减少不必要的文件写入操作
-				setTimeout(() => (isClickConfirm.value = true), 10)
+				// 由于事件监听原因会动态刷新Confirm可点击状态，所以等待Dom加载完成后将确认按钮设为不可点击状态
+				nextTick(() => (isClickConfirm.value = true))
 				break
 		}
 	}

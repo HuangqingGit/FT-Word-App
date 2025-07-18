@@ -1,30 +1,50 @@
 <template>
 	<div class="ft-content">
+		<!-- Main数据区 -->
 		<div class="content-left">
-			<el-breadcrumb :separator-icon="ArrowRight">
+			<el-breadcrumb v-if="activaData" :separator-icon="ArrowRight">
 				<el-breadcrumb-item>{{ MenuStore.activaLevel.name }}</el-breadcrumb-item>
 				<el-breadcrumb-item>{{ activaData.name }}</el-breadcrumb-item>
 			</el-breadcrumb>
 			<el-scrollbar>
-				<draggable class="main-drag-body" v-model="activaData.datas" v-bind="{ animation: 300, group: 'people', handle: '.move' }" item-key="id">
+				<draggable :class="listLength ? 'main-drag-body' : 'empty-drag-body'" :list="activaData.datas" v-bind="{ animation: 300, group: 'people', handle: '.move' }" item-key="id">
 					<template #item="{ element }">
-						<component :is="componentMap[element.type]" :element="element" @addItem="onAddItem" @delItem="onDelItem" />
+						<component :is="componentMap[element.type]" :itemData="element" @delItem="onDelItem" @update-data="element.data = $event" />
+					</template>
+
+					<!-- 空列表占位 -->
+					<template #footer>
+						<div v-if="!listLength" class="empty-placeholder">
+							<div class="empty-msg" v-if="isDragOverB">
+								<el-icon><ft-ep-FolderAdd /></el-icon>
+								<div>松开鼠标完成添加</div>
+							</div>
+							<div class="empty-msg" v-if="!isDragOverB">
+								<el-icon><ft-ep-Guide /></el-icon>
+								<div>从右侧组件库中拖拽组件到此处</div>
+							</div>
+							<div class="drag-overlay" @dragenter="isDragOverB = true" @dragleave="isDragOverB = false" @drop="isDragOverB = false"></div>
+						</div>
 					</template>
 				</draggable>
 			</el-scrollbar>
 		</div>
 
-		<el-tabs v-model="activeName" stretch class="content-right demo-tabs">
-			<el-tab-pane label="组件库" name="first">
+		<!-- 组件/大纲/操作区 -->
+		<el-tabs class="content-right" v-model="activeName" stretch>
+			<el-tab-pane label="组件库" name="library">
+				<el-alert v-if="!tpsAlert" title="请放置组件后再进行数据编辑(此处编辑无效)" type="warning" show-icon @close="closeAlert" />
 				<el-scrollbar>
 					<draggable class="component-library" :list="moduleList" :group="{ name: 'people', pull: 'clone', put: false }" :clone="customClone" item-key="id" :sort="false">
 						<template #item="{ element }">
-							<component :is="componentMap[element.type]" :element="element" @addItem="onAddItem" :library="true" />
+							<component :is="componentMap[element.type]" :itemData="element" @addItem="onLibrary" :library="true" />
 						</template>
 					</draggable>
 				</el-scrollbar>
 			</el-tab-pane>
-			<el-tab-pane label="大纲" name="second">Config</el-tab-pane>
+			<el-tab-pane label="大纲" name="outline">
+				<el-scrollbar>待开发···</el-scrollbar>
+			</el-tab-pane>
 		</el-tabs>
 	</div>
 </template>
@@ -35,70 +55,66 @@ import ftDragInput from "./ft-drag-input.vue"
 import ftDragImige from "./ft-drag-image.vue"
 import { ArrowRight } from "@element-plus/icons-vue"
 import { useMenuStore } from "../stores/index"
+import { ElMessage } from "element-plus"
 
 // ======================= 变量 =======================
 const MenuStore = useMenuStore() // Vue Pinia
-const activeName = ref("组件库")
+const activeName = ref("library")
+const isDragOverB = ref(false)
+const tpsAlert = ref(window.localStorage.getItem("tpsAlert"))
 // 组件映射表
-const componentMap = {
-	ftDragInput,
-	ftDragImige,
-}
+const componentMap = { ftDragInput, ftDragImige }
 // 组件库
 const moduleList = ref([
 	{ id: 1, name: "富文本框", type: "ftDragInput", data: "" },
-	{ id: 2, name: "图片组件", type: "ftDragImige", data: "" },
+	{ id: 2, name: "表单组件", type: "ftDragForm", data: "" },
+	{ id: 3, name: "图片组件", type: "ftDragImige", data: "" },
 ])
 
-const activaData = ref("") // 当前选中菜单数据
+const activaData = ref([]) // 当前选中菜单数据
+const listLength = ref(true)
 
 // ================== Pinia 状态监听 ==================
 MenuStore.$subscribe((state) => {
-	// 菜单切换事件
-	if (state.events.key === "activaMenu" || state.events.key === "activaLevel") activaData.value = MenuStore.activaMenu // 监听页面数据变化
-	// 触发key不是转换当前项目数据后的响应事件
-	if (state.events.key !== "activaToData") MenuStore.activaToPrefix()
-	// 监听数据编辑事件
-	// console.log(MenuStore.activaToData)
+    console.log(state.events)
+	// 预设触发key
+	const keyName = ["activaMenu", "datas", "isList", "data"]
+	const key = state.events.key // 获取 key
+	const type = state.events.type // 获取 type
+
+	// 判断触发的key是否在预设队列中
+	if (keyName.includes(state.events.key) || (type === "add" && typeof Number(key) === "number") || key === "datas") {
+		// 加载当前选中的菜单数据
+		activaData.value = MenuStore.activaMenu
+		// 监听 tpye&key 触发事件，判断 datas 长度用于更新拖拽范围样式
+		listLength.value = activaData.value.datas.length
+		// 处理当前编辑中的数据为Py可转换结构
+		MenuStore.activaToPrefix()
+	}
+
+	// 监听数据编辑事件输出Py数据结构
+	if (state.events.key === "activaToData") {
+		console.log(MenuStore.activaToData)
+	}
 })
 
-/**
- * 添加Item
- * @param {Object} item 添加item子项的element数据
- * @param {Steing} type element组件类型
- * @returns {Null}
- */
-async function onAddItem(item, type) {
-	if (type === "input") item.data.push({ id: crypto.randomUUID(), value: "" })
-	if (type === "images" || type === "image") {
-		const multiple = type === "image" ? false : true // 根据条件设置是否允许多选
-		const imgs = await MenuStore.openFileSelect(multiple, false, [{ name: "Image", extensions: ["png", "jpg", "jpeg", "bmp", "webp", "icon", "ico", "gif"] }])
-		// 用户取消选择
-		if (imgs === null) return
-		// 单项选择
-		if (type === "image") item.data = MenuStore.uint8ArrayToBase64(await MenuStore.readFile(imgs))
-		// 列表选择
-		if (type === "images") {
-			imgs.forEach(async (img) => {
-				item.data.splice(item.data.length - 1, 0, { id: crypto.randomUUID(), value: MenuStore.uint8ArrayToBase64(await MenuStore.readFile(img)) }) // 插入到倒数第二个位置
-			})
-		}
-	}
+// ====================== 方法 ======================
+function closeAlert() {
+	window.localStorage.setItem("tpsAlert", true)
+}
+
+// 组件库的事件
+function onLibrary() {
+	ElMessage({ type: "warning", message: "请添加组件至列表中进行数据编辑", plain: true, offset: 85, grouping: true })
 }
 
 /**
- * 删除组件/列表Item
+ * 删除组件
  * @param {Object} element
- * @param {Object|undefined} item
  * @returns {Null}
  */
-function onDelItem(element, item) {
-	// 删除组件
-	if (item === "ponent") MenuStore.activaMenu.datas = activaData.value.datas.filter((i) => !(i.id === element.id))
-	// 删除图片
-	if (item === "image") element.data = ""
-	// 删除列表数据
-	if (typeof item === "object") element.data = element.data.filter((i) => !(i.id === item.id))
+function onDelItem(element) {
+	MenuStore.activaMenu.datas = activaData.value.datas.filter((i) => !(i.id === element.id))
 }
 
 /**
@@ -111,6 +127,7 @@ function customClone(cloneItem) {
 	const item = JSON.parse(JSON.stringify(cloneItem))
 	// 修改组件唯一ID
 	item.id = crypto.randomUUID()
+	if (item.type === "ftDragInput") item.data = item.isList ? [{ id: crypto.randomUUID(), value: "" }] : ""
 	if (item.type === "ftDragImige") item.data = item.isList ? [{ id: crypto.randomUUID(), value: "add-image" }] : ""
 	// 返回克隆的组件对象
 	return item
@@ -126,6 +143,8 @@ function customClone(cloneItem) {
 		flex: 3;
 		display: flex;
 		flex-direction: column;
+		background-color: #ffffff;
+		border-radius: 5px;
 
 		.el-breadcrumb {
 			padding: 10px 10px;
@@ -136,14 +155,45 @@ function customClone(cloneItem) {
 
 		.main-drag-body {
 			display: grid;
+			min-height: calc(100vh - 100px);
 			grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+			grid-auto-rows: minmax(0px, 333px);
 			gap: 10px;
-			padding: 10px;
+			padding: 0 10px;
+			padding-bottom: 10px;
+		}
 
-			.cs {
-				border: 1px solid #d1d9e0;
-				padding: 10px;
-				border-radius: 5px;
+		.empty-drag-body {
+			height: calc(100vh - 100px);
+			padding: 0 10px;
+			position: relative;
+
+			.empty-placeholder {
+				display: flex;
+				justify-content: center;
+				z-index: 1;
+				position: absolute;
+				user-select: none;
+				width: 100%;
+				height: 100%;
+				color: #dcdfe6;
+
+				.empty-msg {
+					display: flex;
+					flex-direction: column;
+					justify-content: center;
+					align-items: center;
+				}
+
+				.drag-overlay {
+					position: absolute;
+					width: 95%;
+					height: 100%;
+				}
+
+				.el-icon {
+					font-size: 100px;
+				}
 			}
 		}
 	}
@@ -152,19 +202,32 @@ function customClone(cloneItem) {
 		flex: 1;
 		max-width: 400px;
 		min-width: 200px;
-		padding: 0 10px;
-		border-left: 2px dashed var(--el-border-color);
+		background-color: #ffffff;
+		margin-left: 5px;
+		border-radius: 5px;
 
-		.library-title {
-			height: 40px;
-			display: flex;
-			align-items: center;
+		.el-alert {
+			margin: 0 10px;
+			margin-bottom: 10px;
 		}
 
-		.component-library {
-			display: flex;
-			flex-direction: column;
-			gap: 10px;
+		.el-tabs__header {
+			user-select: none;
+		}
+
+		.el-tab-pane {
+			height: 100%;
+
+			.el-scrollbar {
+				padding: 0 10px;
+
+				.component-library {
+					display: flex;
+					flex-direction: column;
+					min-height: calc(100vh - 100px);
+					gap: 10px;
+				}
+			}
 		}
 	}
 
