@@ -1,8 +1,11 @@
 <template>
 	<div class="ft-content">
+		<!-- 空元素占位符 -->
+		<el-empty class="empty-element" description="选择一个项目开始编辑" v-if="!Object.keys(activaData).length" />
+
 		<!-- Main数据区 -->
-		<div class="content-left">
-			<el-breadcrumb v-if="activaData" :separator-icon="ArrowRight">
+		<div class="content-left" v-if="Object.keys(activaData).length">
+			<el-breadcrumb v-if="Object.keys(activaData).length" :separator-icon="ArrowRight">
 				<el-breadcrumb-item>{{ MenuStore.activaLevel.name }}</el-breadcrumb-item>
 				<el-breadcrumb-item>{{ activaData.name }}</el-breadcrumb-item>
 			</el-breadcrumb>
@@ -31,7 +34,7 @@
 		</div>
 
 		<!-- 组件/大纲/操作区 -->
-		<el-tabs class="content-right" v-model="activeName" stretch>
+		<el-tabs class="content-right" v-model="activeName" stretch v-if="Object.keys(activaData).length">
 			<el-tab-pane label="组件库" name="library">
 				<el-alert v-if="!tpsAlert" title="请放置组件后再进行数据编辑(此处编辑无效)" type="warning" show-icon @close="closeAlert" />
 				<el-scrollbar>
@@ -76,7 +79,6 @@ const listLength = ref(true)
 
 // ================== Pinia 状态监听 ==================
 MenuStore.$subscribe((state) => {
-    console.log(state.events)
 	// 预设触发key
 	const keyName = ["activaMenu", "datas", "isList", "data"]
 	const key = state.events.key // 获取 key
@@ -87,14 +89,14 @@ MenuStore.$subscribe((state) => {
 		// 加载当前选中的菜单数据
 		activaData.value = MenuStore.activaMenu
 		// 监听 tpye&key 触发事件，判断 datas 长度用于更新拖拽范围样式
-		listLength.value = activaData.value.datas.length
+		listLength.value = activaData.value.datas?.length
 		// 处理当前编辑中的数据为Py可转换结构
 		MenuStore.activaToPrefix()
 	}
 
 	// 监听数据编辑事件输出Py数据结构
 	if (state.events.key === "activaToData") {
-		console.log(MenuStore.activaToData)
+		// console.log(MenuStore.activaToData)
 	}
 })
 
@@ -138,6 +140,13 @@ function customClone(cloneItem) {
 .ft-content {
 	display: flex;
 	height: 100%;
+
+	.empty-element {
+		flex: 1;
+		background-color: #ffffff;
+		border-radius: 5px;
+		user-select: none;
+	}
 
 	.content-left {
 		flex: 3;

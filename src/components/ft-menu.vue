@@ -260,27 +260,25 @@ function createClass() {
 	// 如果读取结果为空/null，且目录数据不为空时
 	if (fatherId === null && menuList.value.length > 0) {
 		setFatherID(menuList.value[0].index) // 写入第一项的ID
-		fatherId = menuList.value[0].index // 从新赋值第一项ID
+		fatherId = `${menuList.value[0].index}` // 从新赋值第一项ID
 	}
+	// 展开被添加项的菜单
+	proxy.$refs.ftElMenu?.open(fatherId)
 	// 设置曾用名
 	formerName.value = ""
-	// 获取当前激活的目录对象
+	// 获取最近选中的菜单对象
 	const curMenu = menuList.value.find((item) => item.index == fatherId)
-	// 插入数据
+	// 向对象中插入数据
 	curMenu.children.unshift({ name: formerName.value, datas: [], isEdit: true })
-	// 获取当前激活目录的索引
-	let curActiveMenu = null
-	if (curActive.value) curActiveMenu = curActive.value.split("-") // 已有激活菜单时
-	// 展开目录
+	// 已有激活菜单时
 	if (curActive.value) {
-		// 选中的一级菜单ID和最小触发的一及菜单相同才执行
-		if (fatherId === curActiveMenu[0]) curActive.value = `${curActiveMenu[0]}-${Number(curActiveMenu[1]) + 1}`
+		const curAMI = curActive.value.split("-") // 获取当前激活目录的索引
+		if (fatherId === curAMI[0]) curActive.value = `${curAMI[0]}-${Number(curAMI[1]) + 1}` // 选中的一级菜单ID和最小触发的一及菜单相同才执行
 	} else {
 		// session为空时默认选中第一项
 		curActive.value = `${fatherId}-1`
 	}
 	// 等待 DOM 更新后选中Input
-
 	nextTick(() => proxy.$refs[`${fatherId}-0`][0].select())
 }
 
@@ -496,11 +494,14 @@ function dblclick(item, index) {
 function blurClass(name, item, index) {
 	// 获取当前激活目录的索引
 	const curActiveMenu = curActive.value.split("-")
-	// 判断输入的分类名称是否为空字符串
+	const fatherId = window.sessionStorage.getItem("FT-FATHER")
+	// 判断输入的分类名称是否为空字符串（无输入时）,输入名称和曾用名都为空
 	if (item.children[index].name === "" && formerName.value === "") {
-		curActive.value = curActive.value ? `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}` : `${fatherId}-1`
+		// 如果创建的项在激活菜单中，就删除不符合条件的项，重新选中激活菜单
+		if (fatherId === curActiveMenu[0]) curActive.value = `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}`
 		return item.children.shift() // 删除第一项数据
 	}
+
 	// 获取当前选择项目的文件名
 	let fileName = `${dirPath}/${item.fileName}`
 	item.children[index].isEdit = false
@@ -509,9 +510,10 @@ function blurClass(name, item, index) {
 	if (typeof verRes === "string") {
 		// 提示错误信息
 		ElMessage({ type: "warning", message: `分类名称不符合命名规范：${verRes}`, plain: true, offset: 85, grouping: true })
-		// 判断是否创建分类时的名称不符合规范
+		// 判断是否创建分类时的名称不符合规范（有输入时）
 		if (formerName.value === "") {
-			curActive.value = curActive.value ? `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}` : `${fatherId}-1`
+			// 如果创建的项在激活菜单中，就删除不符合条件的项，重新选中激活菜单
+			if (fatherId === curActiveMenu[0]) curActive.value = `${curActiveMenu[0]}-${Number(curActiveMenu[1]) - 1}`
 			return item.children.shift() // 删除第一项数据
 		}
 		// 刷新菜单列表
@@ -670,7 +672,13 @@ function menuOptionsEvent(re_type) {
 						menuList.value.splice(index[0], 1)
 						ElMessage({ type: "success", message: "删除成功", plain: true, offset: 85, grouping: true })
 						// 删除项目后，如果被删除的一级目录是被激活的目录，则清理sessionStorage中缓存的数据
-						if (curActiveIndex[0] == projectData.index) window.sessionStorage.removeItem("FT-CUR-ACTIVE")
+						if (curActiveIndex[0] == projectData.index) {
+							window.sessionStorage.removeItem("FT-CUR-ACTIVE")
+							window.sessionStorage.removeItem("FT-FATHER")
+							MenuStore.setActivaLevel({})
+							MenuStore.setActivaMenu({})
+							getProjectList() // 从新刷新列表
+						}
 					})
 					.catch(() => {})
 				break

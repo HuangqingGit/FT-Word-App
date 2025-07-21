@@ -5,16 +5,16 @@ export const useMenuStore = defineStore('Menu', {
     state: () => ({
         proxy: null,
         menu_lists: [], // 目录列表
-        activaMenu: [],
-        activaLevel: {},
-        activaToData: []
+        activaMenu: {}, // 当前选中菜单的数据
+        activaLevel: {}, // 一级目录信息
+        activaToData: [] // 转化的 Python 数据结构
     }),
     actions: {
         setMenu(value) { this.menu_lists = value },
         setActivaMenu(value) { this.activaMenu = value },
         setActivaLevel(value) { this.activaLevel = value },
         setactivaToData(value) { this.activaToData = value },
-
+        // UUID 转属性字段
         uuidToAttrID(uuid) {
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             if (!uuidRegex.test(uuid)) return "Invalid AttrID format!"
