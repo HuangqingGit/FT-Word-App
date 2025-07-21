@@ -7,7 +7,10 @@ export const useMenuStore = defineStore('Menu', {
         menu_lists: [], // 目录列表
         activaMenu: {}, // 当前选中菜单的数据
         activaLevel: {}, // 一级目录信息
-        activaToData: [] // 转化的 Python 数据结构
+        activaToData: [], // 转化的 Python 数据结构
+        notificationQueue: [], // 通知队列
+        isProcessing: false, // 通知状态
+        NOTIFICATION_DELAY: 150 // 通知间隔时间(ms)
     }),
     actions: {
         setMenu(value) { this.menu_lists = value },
@@ -19,6 +22,32 @@ export const useMenuStore = defineStore('Menu', {
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             if (!uuidRegex.test(uuid)) return "Invalid AttrID format!"
             return uuid.split('-').map(part => part.slice(0, 2)).join('');
+        },
+
+        // 处理通知队列
+        async processNotificationQueue() {
+            if (this.isProcessing || this.notificationQueue.length === 0) return // 如果处于循环状态或通知队列为空则直接退出
+            this.isProcessing = true // 设置通知状态
+            // while循环
+            while (this.notificationQueue.length > 0) {
+                // 取队列中第一项
+                const { title, message, type } = this.notificationQueue.shift()
+
+                // 显示通知
+                ElNotification({
+                    title,
+                    message,
+                    type,
+                    duration: 3000,
+                    showClose: false,
+                    offset: 80
+                })
+
+                // 等待通知间隔
+                await new Promise((resolve) => setTimeout(resolve, this.NOTIFICATION_DELAY))
+            }
+
+            this.isProcessing = false // 设置通知状态
         },
 
         // 把当前选中项目的数据转换成py接收格式的数据

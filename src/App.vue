@@ -1,5 +1,5 @@
 <template>
-	<el-container style="height: 100%">
+	<el-container style="height: 100%" @dragenter="menuDragEvent" @dragover="menuDragEvent" @dragleave="menuDragEvent" @drop="menuDragEvent">
 		<el-header><ft-title /></el-header>
 		<el-container class="main-container">
 			<!-- 目录Menu-Start -->
@@ -13,47 +13,52 @@
 	</el-container>
 </template>
 
-<script>
+<script setup>
+import { ref } from "vue"
 import "element-plus/dist/index.css"
 import { Command } from "@tauri-apps/plugin-shell"
-export default {
-	name: "App",
-	data() {
-		return {
-			text: {},
-			params: {
-				template_path: "C:/Users/F-tone/Desktop/新建文件夹/ces.docx",
-				data: {
-					name: "ft",
-					age: 18,
-					num: 100,
-					img: "C:/Users/F-tone/Pictures/61d7678dgy1hvt194v9kqj20p00uuape.jpg",
-				},
-			},
-		}
+
+// 响应式数据
+const text = ref({})
+const params = ref({
+	template_path: "C:/Users/F-tone/Desktop/新建文件夹/ces.docx",
+	data: {
+		name: "ft",
+		age: 18,
+		num: 100,
+		img: "C:/Users/F-tone/Pictures/61d7678dgy1hvt194v9kqj20p00uuape.jpg",
 	},
-	mounted() {},
-	methods: {
-		// 调用后台Rust服务运行Python
-		run_py() {
-			this.$invoke("run_python", { params: this.params })
-				.then((result) => {
-					console.log(result)
-				})
-				.catch((error) => {
-					console.error(error)
-				})
-		},
-		async run_shell() {
-			try {
-				const command = Command.sidecar("bin/email", [JSON.stringify(this.params.data), this.params.template_path])
-				const output = await command.execute()
-				this.text = output
-			} catch (err) {
-				console.error("❌ Sidecar spawn failed:", err)
-			}
-		},
-	},
+})
+
+// 调用后台Rust服务运行Python
+function run_py() {
+	// 注意：setup中没有this，直接用params.value
+	// 这里假设有全局$invoke方法，否则需要引入
+	window
+		.$invoke("run_python", { params: params.value })
+		.then((result) => {
+			console.log(result)
+		})
+		.catch((error) => {
+			console.error(error)
+		})
+}
+// 调用后台Rust服务运行Shell命令
+// 注意：这里使用了@tauri-apps/plugin-shell插件来执行命令
+async function run_shell() {
+	try {
+		const command = Command.sidecar("bin/email", [JSON.stringify(params.value.data), params.value.template_path])
+		const output = await command.execute()
+		text.value = output
+	} catch (err) {
+		console.error("❌ Sidecar spawn failed:", err)
+	}
+}
+// 监听拖拽事件，阻止默认行为
+// 这样可以防止拖拽文件到页面时触发浏览器默认行为
+function menuDragEvent(e) {
+	e.preventDefault() // 阻止默认事件
+	e.stopPropagation() // 阻止冒泡事件
 }
 </script>
 

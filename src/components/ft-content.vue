@@ -58,7 +58,6 @@ import ftDragInput from "./ft-drag-input.vue"
 import ftDragImige from "./ft-drag-image.vue"
 import { ArrowRight } from "@element-plus/icons-vue"
 import { useMenuStore } from "../stores/index"
-import { ElMessage } from "element-plus"
 
 // ======================= 变量 =======================
 const MenuStore = useMenuStore() // Vue Pinia

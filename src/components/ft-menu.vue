@@ -31,8 +31,26 @@
 		</div>
 
 		<!-- Menu-目录 -->
-		<el-scrollbar>
-			<el-menu class="el-menu-vertical" ref="ftElMenu" :default-active="curActive" @select="curActive = $event">
+		<el-scrollbar
+			@dragenter.stop.prevent="menuDragEvent($event, 'enter')"
+			@dragover.stop.prevent="menuDragEvent($event, 'over')"
+			@dragleave.stop.prevent="menuDragEvent($event, 'leave')"
+			@drop.stop.prevent="menuDragEvent($event, 'drop')"
+			class="ft-menu-scrollbar"
+		>
+			<!-- 文件拖拽元素 -->
+			<div class="drag-element" v-if="menuDargStart">
+				<div class="is-dragover">
+					<el-icon><ft-ep-Document /></el-icon>
+					<span>松开鼠标开始导入</span>
+				</div>
+			</div>
+
+			<!-- 空列表占位元素 -->
+			<el-empty class="menu-empty-element" description="新建或导入一个项目" v-if="!menuList.length && !menuDargStart" />
+
+			<!-- 目录 -->
+			<el-menu class="el-menu-vertical" ref="ftElMenu" v-if="menuList.length" :default-active="curActive" @select="curActive = $event">
 				<el-sub-menu :key="index" :index="item.index.toString()" v-for="(item, index) in menuList" @contextmenu="onContext($event, [index])" @click="setFatherID(item.index.toString())">
 					<template #title>
 						<el-avatar :src="item.icon" :size="32" @error="true">
@@ -163,7 +181,6 @@
 <script setup>
 import { ref, watch, onMounted, nextTick } from "vue"
 import { useMenuStore } from "../stores/index"
-import { ElMessageBox, ElMessage, ElLoading } from "element-plus"
 
 // 模板获取当前实例
 const { proxy } = getCurrentInstance()
@@ -199,6 +216,8 @@ const curMenuIndex = ref([]) // 当前选中菜单索引
 const curActive = ref(window.sessionStorage.getItem("FT-CUR-ACTIVE")) // 当前激活的菜单
 const menuList = ref([]) // 菜单目录列表
 
+const menuDargStart = ref(false) // 目录文件拖拽状态
+
 // ===================== Vue监听 =====================
 watch(projectName, (newVal) => editAuxFun(newVal))
 watch(projectImgBase64, () => editAuxFun(projectName.value))
@@ -221,6 +240,101 @@ MenuStore.$subscribe((list) => {
 onMounted(() => getProjectList())
 
 // ===================== 方法 =====================
+/**
+ *  菜单文件拖拽事件处理函数
+ * @param e 文件拖拽事件
+ * @param type 拖拽触发事件
+ */
+function menuDragEvent(e, type) {
+	if (!e.currentTarget.classList.contains("ft-menu-scrollbar")) return
+	// 只在真正进入/离开容器时处理
+	if (type === "enter" || type === "leave") {
+		if (type === "enter" && e.currentTarget.contains(e.relatedTarget)) return
+		if (type === "leave" && e.currentTarget.contains(e.relatedTarget)) return
+	}
+	e.preventDefault() // 阻止默认事件
+	e.stopPropagation() // 阻止冒泡事件
+
+	if (type === "over") return // 拖拽动作（无操作直接返回）
+	if (type === "enter") {
+		menuDargStart.value = true // 拖拽进入时显示拖拽元素
+	}
+	if (type === "leave") {
+		menuDargStart.value = false // 拖拽离开时隐藏拖拽元素
+	}
+	if (type === "drop") {
+		menuDargStart.value = false // 拖拽结束时隐藏拖拽元素
+		const dt = e.dataTransfer // 获取拖拽数据
+		const newFiles = dt.files // 获取拖拽的文件列表
+		const addFiles = [] // 存储有效文件的数组
+
+		// 如果没有文件，直接返回
+		if (!newFiles.length) return
+
+		// 创建Promise数组，用于处理异步读取
+		const readPromises = Array.from(newFiles).map((file) => {
+			return new Promise((resolve) => {
+				// 只处理JSON文件
+				if (file.type === "application/json") {
+					const reader = new FileReader()
+
+					reader.onload = (fe) => {
+						try {
+							const proIndex = Date.now()
+							const textContent = JSON.parse(fe.target.result)
+
+							// 检查数据格式
+							const requiredKeys = ["name", "prefix", "icon", "children"]
+							const hasAllKeys = requiredKeys.every((key) => key in textContent)
+
+							if (hasAllKeys) {
+								textContent.index = proIndex // 为文件添加唯一ID
+								resolve({
+									filePath: `${dirPath}/${proIndex}.json`,
+									fileData: textContent,
+								})
+							} else {
+								console.warn(`文件 ${file.name} 缺少必要字段`, requiredKeys)
+								showNotification("警告", `文件【${file.name}】缺少必要字段！`, "warning")
+								resolve(null)
+							}
+						} catch (error) {
+							console.error(`解析文件 ${file.name} 失败:`, error)
+							showNotification("错误", `解析文件【${file.name}】失败！`, "error")
+							resolve(null)
+						}
+					}
+					reader.onerror = () => {
+						showNotification("错误", `读取文件【${file.name}】失败`, "error")
+						resolve(null)
+					}
+					reader.readAsText(file)
+				} else {
+					showNotification("提示", `【${file.name}】不是JSON文件，已自动忽略！`, "primary")
+					resolve(null)
+				}
+			})
+		})
+
+		// 等待所有文件读取完成
+		Promise.all(readPromises).then((results) => {
+			// 过滤掉null结果（无效文件）
+			const validFiles = results.filter(Boolean)
+			addFiles.push(...validFiles)
+
+			// 加载一段动画后执行
+			const el_load = ElLoading.service({ text: "正在校验文件" })
+			addFiles.forEach((file) => {
+				MenuStore.writeText(file.filePath, file.fileData)
+			})
+			// 刷新目录
+			setTimeout(() => {
+				el_load.close()
+				getProjectList()
+			}, 1500)
+		})
+	}
+}
 
 // 设置一级目录ID
 function setFatherID(id) {
@@ -465,6 +579,19 @@ function getProjectList() {
 				})
 		}
 	})
+}
+
+/**
+ * 显示通知
+ * @param {string} title - 通知标题
+ * @param {string} message - 通知内容
+ * @param {'primary'|'success'|'warning'|'error'|'info'} [type='info'] - 通知类型
+ */
+function showNotification(title, message, type = "info") {
+	// 将通知加入队列
+	MenuStore.notificationQueue.push({ title, message, type })
+	// 尝试处理队列
+	MenuStore.processNotificationQueue()
 }
 
 /**
@@ -759,7 +886,48 @@ function menuOptionsEvent(re_type) {
 		}
 	}
 
-	.el-scrollbar {
+	.ft-menu-scrollbar {
+		.menu-empty-element,
+		.drag-element {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+			z-index: 1000;
+
+			&::after {
+				content: "";
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				z-index: 1000;
+			}
+
+			& > * {
+				pointer-events: none;
+			}
+		}
+
+		.drag-element {
+			.is-dragover {
+				margin: 3px;
+				display: flex;
+				align-items: center;
+				flex-direction: column;
+				justify-content: center;
+				height: calc(100vh - 85px);
+				border-radius: 5px;
+				border: 1px dashed #409eff;
+				background-color: #ecf5ff;
+				color: #606266;
+				font-size: 14px;
+				.el-icon {
+					font-size: 5rem;
+					color: #a8abb2;
+				}
+			}
+		}
+
 		.el-menu {
 			.is-active {
 				--el-menu-active-color: #409eff;

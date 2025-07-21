@@ -76,7 +76,6 @@
 
 <script setup>
 import { ref, watch, nextTick, onMounted } from "vue"
-import { ElMessageBox, ElMessage } from "element-plus"
 import { useMenuStore } from "../stores/index"
 import { writeText } from "@tauri-apps/plugin-clipboard-manager"
 

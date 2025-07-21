@@ -58,7 +58,6 @@
 
 <script setup>
 import { ref, watch, nextTick, computed, onMounted } from "vue"
-import { ElMessageBox, ElMessage } from "element-plus"
 import { useMenuStore } from "../stores/index"
 import { writeText } from "@tauri-apps/plugin-clipboard-manager"
 import ftImagePreview from "./ft-image-preview.vue"
