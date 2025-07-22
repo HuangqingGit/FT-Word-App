@@ -738,7 +738,7 @@ function validateName(name) {
 function menuOptionsEvent(re_type) {
 	proxy.$refs.ftPopover?.hide() // 隐藏Popover
 	let index = curMenuIndex.value // 当前右键选项的indexs
-	let curActiveIndex = curActive.value.split("-") // 分割当前激活的菜单索引
+	let curActiveIndex = curActive.value?.split("-") // 分割当前激活的菜单索引
 	let projectData = menuList.value[index[0]] // 获取当前选中项目的Data对象
 	let fileName = `${dirPath}/${projectData.fileName}` // 获取当前选择项目的文件名
 	let name1 = projectData.name // 获取选择项目的名称
@@ -766,8 +766,8 @@ function menuOptionsEvent(re_type) {
 							// 获取当前对象长度
 							let delLength = projectData.children.length
 							// 当前操作删除的一级菜单索引等于对应当前激活的一级菜单索引时
-							if ((projectData.index == curActiveIndex[0] && index[1] == curActiveIndex[1] && index[1] == delLength) || index[1] < curActiveIndex[1]) {
-								curActive.value = `${curActiveIndex[0]}-${curActiveIndex[1] - 1}`
+							if ((projectData.index == curActiveIndex?.[0] && index[1] == curActiveIndex?.[1] && index[1] == delLength) || index[1] < curActiveIndex?.[1]) {
+								curActive.value = `${curActiveIndex?.[0]}-${curActiveIndex?.[1] - 1}`
 							}
 							// 显示当前激活的菜单数据
 							menuAuxiliary()
@@ -797,7 +797,7 @@ function menuOptionsEvent(re_type) {
 						menuList.value.splice(index[0], 1)
 						ElMessage({ type: "success", message: "删除成功", plain: true, offset: 85, grouping: true })
 						// 删除项目后，如果被删除的一级目录是被激活的目录，则清理sessionStorage中缓存的数据
-						if (curActiveIndex[0] == projectData.index) {
+						if (curActiveIndex?.[0] == projectData.index) {
 							window.sessionStorage.removeItem("FT-CUR-ACTIVE")
 							window.sessionStorage.removeItem("FT-FATHER")
 							MenuStore.setActivaLevel({})
