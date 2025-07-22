@@ -12,9 +12,10 @@
 	"app": {
 		"windows": [
 			{
-				"title": "国军标",
-				"width": 900,
-				"height": 600,
+				"title": "文档生成器",
+				"width": 1200,
+				"height": 800,
+				"center": true,
 				"minWidth": 600,
 				"minHeight": 400,
 				"decorations": false,

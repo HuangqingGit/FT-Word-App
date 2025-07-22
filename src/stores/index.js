@@ -120,9 +120,9 @@ export const useMenuStore = defineStore('Menu', {
                     // 检查目录是否存在
                     const exists = await this.proxy.$exists(path, { baseDir: baseDir })
                     // 检查的路径/文件存在就返回结果
-                    if (exists) return resolve({ code: 0, msg: "Directory already exists √" })
+                    if (exists) return resolve({ code: 0, msg: "Directory already exists ✅" })
                     // 如果不用创建则直接返回检查结果
-                    if (!isCreate) return resolve({ code: 1, msg: "Directory does not exist ×" })
+                    if (!isCreate) return resolve({ code: 1, msg: "Directory does not exist ❎" })
                     // 递归创建目录
                     const parts = path.split("/").filter(Boolean)
                     let currentPath = ""
@@ -133,11 +133,11 @@ export const useMenuStore = defineStore('Menu', {
                             await this.proxy.$mkdir(currentPath, { baseDir: baseDir })
                         }
                     }
-                    resolve({ code: 0, msg: "Directory created successfully √" })
+                    resolve({ code: 0, msg: "Directory created successfully ✅" })
                 } catch (error) {
                     reject({
                         code: 1,
-                        msg: "Failed to create directory ×",
+                        msg: "Failed to create directory ❎",
                         error,
                     })
                 }
@@ -173,9 +173,9 @@ export const useMenuStore = defineStore('Menu', {
                     const writeRes = this.proxy.$writeTextFile(writePath, JSON.stringify(writeData), { baseDir: baseDir, encoding: "utf-8" })
                     // 写入成功 返回结果
                     if (writeRes) {
-                        resolve({ code: 0, msg: "Write success √" })
+                        resolve({ code: 0, msg: "Write success ✅" })
                     } else {
-                        reject({ code: 1, msg: "Write failed ×" })
+                        reject({ code: 1, msg: "Write failed ❎" })
                     }
                 } catch (error) {
                     reject({ code: 1, msg: "Write failed ×", error })
@@ -195,9 +195,9 @@ export const useMenuStore = defineStore('Menu', {
                     // 写入文件 这里的需要转字符串再写入
                     const remRes = this.proxy.$remove(delPath, { baseDir: baseDir })
                     // 删除成功 返回结果
-                    if (remRes) resolve({ code: 0, msg: "Delete success √" })
+                    if (remRes) resolve({ code: 0, msg: "Delete success ✅" })
                 } catch (error) {
-                    reject({ code: 1, msg: "Delete failed ×", error })
+                    reject({ code: 1, msg: "Delete failed ❎", error })
                 }
             })
         },

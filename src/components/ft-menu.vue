@@ -256,17 +256,12 @@ function menuDragEvent(e, type) {
 	e.stopPropagation() // 阻止冒泡事件
 
 	if (type === "over") return // 拖拽动作（无操作直接返回）
-	if (type === "enter") {
-		menuDargStart.value = true // 拖拽进入时显示拖拽元素
-	}
-	if (type === "leave") {
-		menuDargStart.value = false // 拖拽离开时隐藏拖拽元素
-	}
+	if (type === "enter") menuDargStart.value = true // 拖拽进入时显示拖拽元素
+	if (type === "leave") menuDargStart.value = false // 拖拽离开时隐藏拖拽元素
 	if (type === "drop") {
 		menuDargStart.value = false // 拖拽结束时隐藏拖拽元素
 		const dt = e.dataTransfer // 获取拖拽数据
 		const newFiles = dt.files // 获取拖拽的文件列表
-		const addFiles = [] // 存储有效文件的数组
 
 		// 如果没有文件，直接返回
 		if (!newFiles.length) return
@@ -320,18 +315,21 @@ function menuDragEvent(e, type) {
 		Promise.all(readPromises).then((results) => {
 			// 过滤掉null结果（无效文件）
 			const validFiles = results.filter(Boolean)
-			addFiles.push(...validFiles)
+			if (!validFiles.length) return // 如果没有有效文件，直接返回
 
 			// 加载一段动画后执行
 			const el_load = ElLoading.service({ text: "正在校验文件" })
-			addFiles.forEach((file) => {
-				MenuStore.writeText(file.filePath, file.fileData)
-			})
+
 			// 刷新目录
 			setTimeout(() => {
-				el_load.close()
-				getProjectList()
-			}, 1500)
+				// 延迟遍历
+				validFiles.forEach(async (file) => {
+					const ret = await MenuStore.writeText(file.filePath, file.fileData)
+					if (ret.code == 0) showNotification("成功", `【${file.fileData.name}】导入成功！`, "success")
+				})
+				el_load.close() // 关闭动画
+				getProjectList() // 刷新列表
+			}, 1000)
 		})
 	}
 }
