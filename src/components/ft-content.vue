@@ -34,21 +34,45 @@
 		</div>
 
 		<!-- 组件/大纲/操作区 -->
-		<el-tabs class="content-right" v-model="activeName" stretch v-if="Object.keys(activaData).length">
-			<el-tab-pane label="组件库" name="library">
-				<el-alert v-if="!tpsAlert" title="请放置组件后再进行数据编辑(此处编辑无效)" type="warning" show-icon @close="closeAlert" />
-				<el-scrollbar>
-					<draggable class="component-library" :list="moduleList" :group="{ name: 'people', pull: 'clone', put: false }" :clone="customClone" item-key="id" :sort="false">
-						<template #item="{ element }">
-							<component :is="componentMap[element.type]" :itemData="element" @addItem="onLibrary" :library="true" />
-						</template>
-					</draggable>
-				</el-scrollbar>
-			</el-tab-pane>
-			<el-tab-pane label="大纲" name="outline">
-				<el-scrollbar>待开发···</el-scrollbar>
-			</el-tab-pane>
-		</el-tabs>
+		<div class="content-right" v-if="Object.keys(activaData).length">
+			<el-tabs v-model="activeName" stretch>
+				<el-tab-pane label="组件库" name="library">
+					<el-alert v-if="!tpsAlert" title="请放置组件后再进行数据编辑(此处编辑无效)" type="warning" show-icon @close="closeAlert" />
+					<el-scrollbar class="library-scrollbar">
+						<draggable class="component-library" :list="moduleList" :group="{ name: 'people', pull: 'clone', put: false }" :clone="customClone" item-key="id" :sort="false">
+							<template #item="{ element }">
+								<component :is="componentMap[element.type]" :itemData="element" @addItem="onLibrary" :library="true" />
+							</template>
+						</draggable>
+					</el-scrollbar>
+				</el-tab-pane>
+				<el-tab-pane label="大纲" name="outline">
+					<el-scrollbar>待开发···</el-scrollbar>
+				</el-tab-pane>
+			</el-tabs>
+			<div class="control-area">
+				<div class="area-main">
+					<div class="main-item">
+						<span class="area-name">模板文件</span>
+						<el-scrollbar class="template-path" view-class="template-view">
+							<el-tag @close="handleClose(file)" v-for="(file, index) in templatePath" :key="index" closable type="primary">{{ getFileName(file) }}</el-tag>
+							<el-icon class="close-all-item" v-if="templatePath.length" @click="templatePath = []"><ft-ep-Close /></el-icon>
+						</el-scrollbar>
+						<el-button @click="SelectFolder(true)" :icon="FolderOpened" />
+					</div>
+					<div class="template-count" v-if="templatePath.length">已选择 {{ templatePath.length }} 个文件</div>
+					<div class="main-item">
+						<span class="area-name">输出路径</span>
+						<div class="output-path">{{ outputPath }}</div>
+						<el-button @click="SelectFolder(false)" :icon="FolderOpened" />
+					</div>
+				</div>
+				<div class="area-footer">
+					<el-button type="primary" @click="SelectFolder(false)">保存</el-button>
+					<el-button type="primary" @click="SelectFolder(false)">输出</el-button>
+				</div>
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -58,6 +82,7 @@ import ftDragInput from "./ft-drag-input.vue"
 import ftDragImige from "./ft-drag-image.vue"
 import { ArrowRight } from "@element-plus/icons-vue"
 import { useMenuStore } from "../stores/index"
+import { FolderOpened } from "@element-plus/icons-vue"
 
 // ======================= 变量 =======================
 const MenuStore = useMenuStore() // Vue Pinia
@@ -75,6 +100,8 @@ const moduleList = ref([
 
 const activaData = ref([]) // 当前选中菜单数据
 const listLength = ref(true)
+const templatePath = ref([]) // 模板路径
+const outputPath = ref("") // 输出路径
 
 // ================== Pinia 状态监听 ==================
 MenuStore.$subscribe((state) => {
@@ -100,6 +127,34 @@ MenuStore.$subscribe((state) => {
 })
 
 // ====================== 方法 ======================
+
+// 选择文件路径
+async function SelectFolder(isFiles) {
+	// 调用 Tauri API 让用户选择文件或文件夹
+	const folder = await MenuStore.openFileSelect(isFiles, !isFiles, [{ name: "文件类型", extensions: ["docx"] }])
+	// 根据 isFiles 判断是选择文件还是文件夹
+	if (isFiles) {
+		if (folder) templatePath.value = [...new Set([...templatePath.value, ...folder])] // 追加文件到模板路径，同时去重
+	} else {
+		if (folder) outputPath.value = folder // 设置输出路径
+	}
+}
+
+function handleClose(tag) {
+	// 从模板路径中移除指定的文件
+	templatePath.value = templatePath.value.filter((item) => item !== tag)
+}
+
+/**
+ * 获取一个路径的文件名
+ * @param path
+ */
+function getFileName(path) {
+	const parts = path.split("\\")
+	return parts[parts.length - 1]
+}
+
+// tps 提示元素已读方法
 function closeAlert() {
 	window.localStorage.setItem("tpsAlert", true)
 }
@@ -133,6 +188,8 @@ function customClone(cloneItem) {
 	// 返回克隆的组件对象
 	return item
 }
+
+// 调用Tauri API 让用户选择保存路径
 </script>
 
 <style lang="less">
@@ -213,28 +270,117 @@ function customClone(cloneItem) {
 		background-color: #ffffff;
 		margin-left: 5px;
 		border-radius: 5px;
+		display: flex;
+		flex-direction: column;
 
-		.el-alert {
-			margin: 0 10px;
-			margin-bottom: 10px;
-		}
+		.el-tabs {
+			flex: 1;
 
-		.el-tabs__header {
-			user-select: none;
-		}
+			.el-alert {
+				margin: 0 10px;
+				margin-bottom: 10px;
+			}
 
-		.el-tab-pane {
-			height: 100%;
+			.el-tabs__header {
+				user-select: none;
+			}
 
-			.el-scrollbar {
-				padding: 0 10px;
+			.el-tab-pane {
+				height: 100%;
 
-				.component-library {
-					display: flex;
-					flex-direction: column;
-					min-height: calc(100vh - 100px);
-					gap: 10px;
+				.library-scrollbar {
+					padding: 0 10px;
+					height: calc(100vh - 360px);
+
+					.component-library {
+						display: flex;
+						flex-direction: column;
+						gap: 10px;
+					}
 				}
+			}
+		}
+
+		.control-area {
+			height: 240px;
+			border-top: 1px solid #dcdfe6;
+			margin-top: 10px;
+			padding: 5px;
+			display: flex;
+			flex-direction: column;
+
+			.area-main {
+				flex: 1;
+				overflow: hidden;
+
+				.main-item {
+					display: flex;
+					padding: 5px;
+					align-items: center;
+					gap: 10px;
+					font-size: 14px;
+					color: #606266;
+					user-select: none;
+
+					.template-path,
+					.output-path {
+						flex: 1;
+						padding: 5px;
+						border-radius: 5px;
+						border: 1px solid #dcdfe6;
+						min-height: 20px;
+
+						.el-scrollbar__wrap {
+							max-height: 120px;
+							height: 100%;
+
+							.template-view {
+								display: flex;
+								flex-wrap: wrap;
+								gap: 5px;
+							}
+						}
+					}
+
+					.template-path {
+						position: relative;
+
+						.close-all-item {
+							position: absolute;
+							right: 5px;
+							top: calc(50% - 8px);
+							border-radius: 50%;
+							padding: 2px;
+							cursor: pointer;
+							color: #909399;
+							&:hover {
+								background-color: #d4d7de;
+								color: #ffffff;
+							}
+						}
+					}
+
+					.output-path {
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+						background-color: #f5f7fa;
+					}
+				}
+
+				.template-count {
+					margin-left: 75px;
+					font-size: 12px;
+					color: #606266;
+					user-select: none;
+				}
+			}
+
+			.area-footer {
+				height: 40px;
+				padding: 0 5px;
+				display: flex;
+				align-items: center;
 			}
 		}
 	}
